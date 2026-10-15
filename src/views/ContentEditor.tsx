@@ -23,7 +23,7 @@ export function ContentEditor() {
       checks: lines(checks).map(l => { const i = l.lastIndexOf('|'); return [l.slice(0, i < 0 ? undefined : i).trim(), i < 0 ? 0 : parseInt(l.slice(i + 1), 10) || 0] as [string, number] }),
       deds: lines(deds),
       glow: lines(glow).map(pair), notes: lines(notes).map(pair), qa: lines(qa).map(pair),
-      bad: cvFrom(bad), good: cvFrom(good),
+      bad: cvFrom(bad), good: cvFrom(good), samples: c.samples,
     }
     const r = await dbUpsert('content', { id: 'v1', data, updated_at: new Date().toISOString() })
     setMsg(r.ok ? 'Saved. Every phone and the projector use it now.' : 'Could not save.')

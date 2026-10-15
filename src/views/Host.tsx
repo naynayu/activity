@@ -148,6 +148,14 @@ function CvSlot({ round }: { round: string }) {
   const [image, setImage] = useState<string | null>(null)
   const [hide, setHide] = useState(true)
   const [msg, setMsg] = useState('')
+  const n = Number(round.replace('cv', '')) || 1
+  const note = c.samples[n - 1]?.note
+  async function loadAll() {
+    const rows = c.samples.map((x, i) => ({ round: `cv${i + 1}`, text: x.text, image: null, updated_at: new Date().toISOString() }))
+    const { error } = await sb.from('cvs').upsert(rows)
+    if (!error) { setSession({ weak_line: c.samples[n - 1]?.weak ?? c.samples[0].weak }); setText(c.samples[n - 1]?.text ?? ''); setImage(null) }
+    setMsg(error ? 'Could not load them.' : `Loaded ${rows.length} sample CVs. Patient ${n} is ready. “Next patient” moves to the next one.`)
+  }
   async function save() {
     const body = image ? null : (hide ? maskContacts(text) : text).trim() || null
     const { error } = await sb.from('cvs').upsert({ round, text: body, image, updated_at: new Date().toISOString() })
@@ -161,11 +169,14 @@ function CvSlot({ round }: { round: string }) {
       <label className="opt" style={{ border: 0 }}><input type="checkbox" checked={hide} onChange={e => setHide(e.target.checked)} /><span>Hide phone numbers and emails in pasted text</span></label>
       <div className="row">
         <label className="btn">📷 Add a photo or screenshot<input type="file" accept="image/*" hidden onChange={async e => { const f = e.target.files?.[0]; if (f) { setImage(await shrinkImage(f)); setMsg('') } }} /></label>
-        <button className="btn" onClick={() => { setText(c.bad.text); setImage(null) }}>Use the example CV</button>
+        <select className="input" style={{ maxWidth: 260, margin: 0 }} value="" onChange={e => { const x = c.samples[Number(e.target.value)]; if (x) { setText(x.text); setImage(null); setMsg('') } }}>
+          <option value="">Load a sample CV…</option>{c.samples.map((x, n) => <option key={x.name} value={n}>{n + 1}. {x.name}</option>)}</select>
         {image && <button className="btn" onClick={() => setImage(null)}>Remove photo</button>}
       </div>
       {image && <><img className="cv-img" style={{ maxHeight: 220, width: 'auto' }} src={image} alt="Preview" /><p className="neg small">Photos are not masked. Cover phone numbers, emails and addresses before taking the photo.</p></>}
       <button className="btn btn-primary btn-big" disabled={!text.trim() && !image} onClick={save}>Save this CV</button>
+      <button className="btn btn-big" onClick={loadAll}>Load all {c.samples.length} sample CVs as patients 1 to {c.samples.length}</button>
+      {note && <p className="host-note"><b>Host note:</b> {note}</p>}
       {msg && <p className="pos small">{msg}</p>}
       {saved && (saved.text || saved.image) && !msg && <p className="muted small">A CV is saved for patient {round.replace('cv', '')}.</p>}
     </section>
@@ -173,6 +184,7 @@ function CvSlot({ round }: { round: string }) {
 }
 
 function VoteControls({ s }: { s: SessionRow }) {
+  const c = useContent()
   const votes = useTable<VoteRow>('votes').rows.filter(v => v.round === s.round)
   const patient = Number(s.round.replace('cv', '')) || 1
   const hire = votes.filter(v => v.choice === 'hire').length
@@ -185,7 +197,7 @@ function VoteControls({ s }: { s: SessionRow }) {
       <div className="row" style={{ marginTop: 10 }}>
         <button className="btn" onClick={() => setSession({ voting_open: !s.voting_open })}>{s.voting_open ? 'Close voting' : 'Open voting'}</button>
         <button className="btn" onClick={() => setSession({ reveal: !s.reveal })}>{s.reveal ? 'Hide the CV' : 'Show the CV only'}</button>
-        <button className="btn" onClick={() => setSession({ round: `cv${patient + 1}`, ...timer(null), voting_open: false, reveal: false })}>Next patient →</button>
+        <button className="btn" onClick={() => setSession({ round: `cv${patient + 1}`, ...timer(null), voting_open: false, reveal: false, ...(c.samples[patient] ? { weak_line: c.samples[patient].weak } : {}) })}>Next patient →</button>
       </div>
     </section>
     </>
@@ -193,13 +205,18 @@ function VoteControls({ s }: { s: SessionRow }) {
 }
 
 function RewriteControls({ s, people }: { s: SessionRow; people: Participant[] }) {
+  const c = useContent()
   const subs = useTable<SubmissionRow>('submissions').rows.filter(x => x.round === s.round)
+  const real = subs.filter(x => !x.example)
+  const examples = subs.filter(x => x.example)
+  const patient = Number(s.round.replace('cv', '')) || 1
+  const mine = c.samples[patient - 1]
   const left = useCountdown(s.timer_end)
   const [line, setLine] = useState(s.weak_line ?? '')
-  const name = (id: string) => people.find(p => p.id === id)?.name ?? ''
+  const name = (id: string | null) => (id ? people.find(p => p.id === id)?.name ?? '' : 'Example')
   async function pick(x: SubmissionRow) {
     await sb.from('submissions').update({ picked: !x.picked }).eq('id', x.id)
-    if (!x.picked) await dbInsert('awards', [{ id: crypto.randomUUID(), participant_id: x.participant_id, points: 10, reason: 'Rewrite pick', created_at: new Date().toISOString() }])
+    if (!x.picked && x.participant_id) await dbInsert('awards', [{ id: crypto.randomUUID(), participant_id: x.participant_id, points: 10, reason: 'Rewrite pick', created_at: new Date().toISOString() }])
   }
   return (
     <section className="card">
@@ -210,11 +227,21 @@ function RewriteControls({ s, people }: { s: SessionRow; people: Participant[] }
         <button className="btn btn-primary" onClick={() => setSession({ ...timer(60), submit_open: true })}>Start 60 seconds {left != null ? `(${clock(left)})` : ''}</button>
         <button className="btn" onClick={() => setSession({ ...timer(null), submit_open: false })}>Stop and close</button>
       </div>
-      <h3>Rewrites ({subs.length})</h3>
-      {subs.map(x => (
+      <h3>Rewrites ({real.length})</h3>
+      {real.length === 0 && <p className="muted">No rewrites yet. They appear here as people send them.</p>}
+      {real.map(x => (
         <div key={x.id} className={`q ${x.picked ? 'picked' : ''}`}><div className="q-body"><div className="q-text">{x.content}</div><small className="faint">{name(x.participant_id)}</small></div>
           <button className={`btn ${x.picked ? 'btn-primary' : ''}`} onClick={() => pick(x)}>{x.picked ? 'Picked' : 'Pick +10'}</button></div>
       ))}
+      <h3>Example rewrites</h3>
+      <p className="muted small">For when the room is quiet. They show on every phone, marked as examples.</p>
+      {mine
+        ? <div className="row">
+            <button className="btn" disabled={examples.length > 0} onClick={() => dbInsert('submissions', mine.rewrites.map(content => ({ id: crypto.randomUUID(), participant_id: null, round: s.round, content, picked: true, example: true, created_at: new Date().toISOString() })))}>Show {mine.rewrites.length} example rewrites to everyone</button>
+            {examples.length > 0 && <button className="btn" onClick={() => dbDelete('submissions', { round: s.round, example: true })}>Remove the examples</button>}
+          </div>
+        : <p className="muted small">No examples for this patient. Add your own on the “Edit the content” panel, or pick the best real rewrite.</p>}
+      {examples.map(x => <div key={x.id} className="q picked"><div className="q-body"><div className="q-text">{x.content}</div><small className="faint">Example</small></div></div>)}
     </section>
   )
 }

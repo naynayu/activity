@@ -23,7 +23,7 @@ export interface SessionRow {
 }
 export interface Participant { id: string; name: string; created_at: string; last_seen: string }
 export interface VoteRow { participant_id: string; round: string; choice: 'hire' | 'pass' }
-export interface SubmissionRow { id: string; participant_id: string; round: string; content: string; picked: boolean; created_at: string }
+export interface SubmissionRow { id: string; participant_id: string | null; round: string; content: string; picked: boolean; example: boolean; created_at: string }
 export interface ScoreRow { participant_id: string; score: number; checks: number[]; deds: number[]; typos: number; updated_at: string }
 export interface AwardRow { id: string; participant_id: string; points: number; reason: string | null; created_at: string }
 export interface QuestionRow { id: string; participant_id: string | null; text: string; answered: boolean; created_at: string }

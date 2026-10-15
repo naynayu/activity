@@ -115,7 +115,7 @@ function Rewrite({ me, s }: { me: P; s: SessionRow }) {
         <button className="btn btn-primary btn-big" disabled={!text.trim() || !open} onClick={send}>Send my rewrite</button>
       </div>
       {subs.map(x => <div key={x.id} className={`card ${x.picked ? 'picked' : ''}`}>{x.content}{x.picked && <div className="pos small">Picked by the host 🎉</div>}</div>)}
-      {best.length > 0 && <><h3>Best rewrites 🎉</h3>{best.map(x => <div key={x.id} className="card picked">{x.content}<div className="faint small">{people.find(p => p.id === x.participant_id)?.name}</div></div>)}</>}
+      {best.length > 0 && <><h3>Best rewrites 🎉</h3>{best.map(x => <div key={x.id} className="card picked">{x.content}<div className="faint small">{x.example ? 'Example' : people.find(p => p.id === x.participant_id)?.name}</div></div>)}</>}
     </>
   )
 }

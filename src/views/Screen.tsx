@@ -86,7 +86,7 @@ function Rewrite({ s, people }: { s: SessionRow; people: Participant[] }) {
   const subs = useTable<SubmissionRow>('submissions').rows.filter(x => x.round === s.round)
   const left = useCountdown(s.timer_end)
   const list = [...subs].sort((a, b) => Number(b.picked) - Number(a.picked) || b.created_at.localeCompare(a.created_at))
-  const who = (id: string) => people.find(p => p.id === id)?.name ?? ''
+  const who = (id: string | null) => (id ? people.find(p => p.id === id)?.name ?? '' : 'Example')
   return (
     <div>
       <div className="screen-center" style={{ minHeight: 0, marginBottom: 12 }}>
