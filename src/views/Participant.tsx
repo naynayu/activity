@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Board } from '../components/Board'
+import { CvView, useCv } from '../components/PatientCv'
 import { Questions } from '../components/Questions'
 import { Scorecard, type Card } from '../components/Scorecard'
 import { StatusDot } from '../components/Status'
@@ -49,35 +50,48 @@ export function Participant({ me, onLeave }: { me: P; onLeave: () => void }) {
 const Closed = ({ text }: { text: string }) => <div className="card center muted">🔒 {text}</div>
 
 function Vote({ me, s }: { me: P; s: SessionRow }) {
-  const votes = useTable<VoteRow>('votes').rows
-  const left = useCountdown(s.timer_end)
+  const votes = useTable<VoteRow>('votes').rows.filter(v => v.round === s.round)
+  const cv = useCv(s.round, `${s.reveal}`)
   const [err, setErr] = useState('')
-  const mine = votes.find(v => v.participant_id === me.id && v.round === s.round)?.choice
+  const mine = votes.find(v => v.participant_id === me.id)?.choice
   async function vote(choice: 'hire' | 'pass') {
     setErr('')
     const r = await dbUpsert('votes', { participant_id: me.id, round: s.round, choice })
     if (!r.ok) setErr('Voting is closed.')
   }
-  const looking = left != null && left > 0 && s.voting_open
+  const hire = votes.filter(v => v.choice === 'hire').length, pass = votes.length - hire
   return (
     <>
-      <div className="card center">
-        <div className="muted">Patient {s.round.replace('cv', '')}</div>
-        <div className="big">{looking ? left : s.voting_open ? 'Vote now' : 'Get ready'}</div>
-      </div>
-      {!s.voting_open && !mine && <Closed text="Voting opens when the host shows the CV." />}
+      {s.reveal ? (
+        <>
+          <div className="muted small">Patient {s.round.replace('cv', '')}</div>
+          <CvView cv={cv} />
+        </>
+      ) : (
+        <div className="card center">
+          <div className="muted">Patient {s.round.replace('cv', '')}</div>
+          <div className="big">Get ready</div>
+          <p className="muted small">The CV appears here when the host shows it.</p>
+        </div>
+      )}
       <div className="two">
         <button className={`btn btn-big vote ${mine === 'hire' ? 'btn-primary' : ''}`} disabled={!s.voting_open} onClick={() => vote('hire')}>👍 Hire</button>
         <button className={`btn btn-big vote ${mine === 'pass' ? 'btn-primary' : ''}`} disabled={!s.voting_open} onClick={() => vote('pass')}>👎 Pass</button>
       </div>
       {mine && <p className="center muted">You voted {mine}.{s.voting_open ? ' You can change it.' : ''}</p>}
+      {!s.voting_open && s.reveal && !mine && <p className="center muted">🔒 Voting is closed.</p>}
       {err && <p className="center neg">{err}</p>}
+      {(mine || !s.voting_open) && votes.length > 0 && <div className="card center"><b className="pos">👍 {hire}</b> &nbsp;·&nbsp; <b className="neg">👎 {pass}</b><div className="muted small">{votes.length} votes so far</div></div>}
     </>
   )
 }
 
 function Rewrite({ me, s }: { me: P; s: SessionRow }) {
-  const subs = useTable<SubmissionRow>('submissions').rows.filter(x => x.participant_id === me.id && x.round === s.round)
+  const all = useTable<SubmissionRow>('submissions').rows.filter(x => x.round === s.round)
+  const subs = all.filter(x => x.participant_id === me.id)
+  const best = all.filter(x => x.picked)
+  const people = useTable<P>('participants').rows
+  const cv = useCv(s.round, 'rewrite')
   const left = useCountdown(s.timer_end)
   const [text, setText] = useState('')
   const [err, setErr] = useState('')
@@ -93,6 +107,7 @@ function Rewrite({ me, s }: { me: P; s: SessionRow }) {
     <>
       <div className="card center"><div className="muted">Rewrite this line</div><h3 style={{ margin: '6px 0' }}>“{s.weak_line || 'The host will show the line'}”</h3>
         {left != null && <div className="big">{clock(left)}</div>}</div>
+      <details open><summary>The CV</summary><CvView cv={cv} /></details>
       {!open && <Closed text={left === 0 ? 'Time is up.' : 'Opens when the host starts the timer.'} />}
       <div className="card">
         <textarea className="input" rows={4} maxLength={400} disabled={!open} placeholder="Example: Managed 300+ client files and cut search time from 15 minutes to under 5." value={text} onChange={e => setText(e.target.value)} />
@@ -100,6 +115,7 @@ function Rewrite({ me, s }: { me: P; s: SessionRow }) {
         <button className="btn btn-primary btn-big" disabled={!text.trim() || !open} onClick={send}>Send my rewrite</button>
       </div>
       {subs.map(x => <div key={x.id} className={`card ${x.picked ? 'picked' : ''}`}>{x.content}{x.picked && <div className="pos small">Picked by the host 🎉</div>}</div>)}
+      {best.length > 0 && <><h3>Best rewrites 🎉</h3>{best.map(x => <div key={x.id} className="card picked">{x.content}<div className="faint small">{people.find(p => p.id === x.participant_id)?.name}</div></div>)}</>}
     </>
   )
 }

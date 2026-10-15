@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react'
+import QRCode from 'qrcode'
+import { useEffect, useMemo, useState } from 'react'
 import { Board } from '../components/Board'
+import { maskContacts, shrinkImage, useCv } from '../components/PatientCv'
 import { Questions } from '../components/Questions'
 import { StatusDot } from '../components/Status'
 import { HOST_PIN } from '../config'
@@ -36,6 +38,7 @@ function Console() {
   const scores = useTable<ScoreRow>('scores').rows
   const awards = useTable<AwardRow>('awards').rows
   const board = useMemo(() => buildBoard(people, scores, awards), [people, scores, awards])
+  const [share, setShare] = useState(false)
   if (!s) return <div className="phone"><p>Loading…</p></div>
 
   const i = stepIndex(s.phase)
@@ -54,8 +57,10 @@ function Console() {
     <div className="host">
       <header className="hostbar">
         <div><b>Host console</b> <StatusDot /><div className="faint small">{people.length} joined · {scores.length} scores sent · about {left} min left</div></div>
-        <a className="btn" href="#screen" target="_blank" rel="noreferrer">Open projector</a>
+        <button className="btn" onClick={() => setShare(v => !v)}>{share ? 'Hide' : 'Share the link'}</button>
       </header>
+
+      {share && <ShareCard />}
 
       <section className="card now">
         <div className="faint small">Step {i + 1} of {STEPS.length}</div>
@@ -114,6 +119,21 @@ function Console() {
   )
 }
 
+function ShareCard() {
+  const url = location.origin + location.pathname
+  const [qr, setQr] = useState('')
+  useEffect(() => { QRCode.toDataURL(url, { margin: 1, width: 360 }).then(setQr) }, [url])
+  return (
+    <section className="card center">
+      <h3>Join link</h3>
+      {qr && <img src={qr} alt="QR code" style={{ width: 240, borderRadius: 12, background: '#fff', padding: 6 }} />}
+      <p><b>{url}</b></p>
+      <button className="btn btn-primary" onClick={() => navigator.clipboard?.writeText(url)}>Copy the link</button>
+      <p className="muted small">Paste it in the WhatsApp group, or show this code on your phone for people to scan.</p>
+    </section>
+  )
+}
+
 function Toggle({ label, on, onLabel, offLabel, set }: { label: string; on: boolean; onLabel: string; offLabel: string; set: (v: boolean) => void }) {
   return <section className="card"><div className="row"><span>{label}: <b>{on ? 'showing' : 'hidden'}</b></span>
     <button className="btn btn-primary" onClick={() => set(!on)}>{on ? onLabel : offLabel}</button></div></section>
@@ -121,20 +141,54 @@ function Toggle({ label, on, onLabel, offLabel, set }: { label: string; on: bool
 
 const timer = (sec: number | null) => ({ timer_end: sec == null ? null : new Date(serverNow() + sec * 1000).toISOString() })
 
+function CvSlot({ round }: { round: string }) {
+  const c = useContent()
+  const saved = useCv(round, 'host')
+  const [text, setText] = useState('')
+  const [image, setImage] = useState<string | null>(null)
+  const [hide, setHide] = useState(true)
+  const [msg, setMsg] = useState('')
+  async function save() {
+    const body = image ? null : (hide ? maskContacts(text) : text).trim() || null
+    const { error } = await sb.from('cvs').upsert({ round, text: body, image, updated_at: new Date().toISOString() })
+    setMsg(error ? 'Could not save.' : 'Saved. Every phone shows it when you press Show.')
+  }
+  return (
+    <section className="card">
+      <h3>This patient’s CV</h3>
+      <p className="muted small">Paste the text, or add a photo or screenshot. Nothing shows on any phone until you press “Show the CV”. It then stays on screen through Hire or Pass and Fix the line.</p>
+      <textarea className="input" rows={6} placeholder="Paste the CV text here" value={text} disabled={!!image} onChange={e => { setText(e.target.value); setMsg('') }} />
+      <label className="opt" style={{ border: 0 }}><input type="checkbox" checked={hide} onChange={e => setHide(e.target.checked)} /><span>Hide phone numbers and emails in pasted text</span></label>
+      <div className="row">
+        <label className="btn">📷 Add a photo or screenshot<input type="file" accept="image/*" hidden onChange={async e => { const f = e.target.files?.[0]; if (f) { setImage(await shrinkImage(f)); setMsg('') } }} /></label>
+        <button className="btn" onClick={() => { setText(c.bad.text); setImage(null) }}>Use the example CV</button>
+        {image && <button className="btn" onClick={() => setImage(null)}>Remove photo</button>}
+      </div>
+      {image && <><img className="cv-img" style={{ maxHeight: 220, width: 'auto' }} src={image} alt="Preview" /><p className="neg small">Photos are not masked. Cover phone numbers, emails and addresses before taking the photo.</p></>}
+      <button className="btn btn-primary btn-big" disabled={!text.trim() && !image} onClick={save}>Save this CV</button>
+      {msg && <p className="pos small">{msg}</p>}
+      {saved && (saved.text || saved.image) && !msg && <p className="muted small">A CV is saved for patient {round.replace('cv', '')}.</p>}
+    </section>
+  )
+}
+
 function VoteControls({ s }: { s: SessionRow }) {
   const votes = useTable<VoteRow>('votes').rows.filter(v => v.round === s.round)
-  const left = useCountdown(s.timer_end)
   const patient = Number(s.round.replace('cv', '')) || 1
   const hire = votes.filter(v => v.choice === 'hire').length
   return (
+    <>
+    <CvSlot round={s.round} />
     <section className="card">
       <div className="row"><b>Patient {patient}</b><span><b className="pos">👍 {hire}</b> · <b className="neg">👎 {votes.length - hire}</b></span></div>
-      <button className="btn btn-primary btn-big" onClick={() => setSession({ ...timer(6), voting_open: true })}>Show the CV for 6 seconds {left ? `(${left})` : ''}</button>
+      <button className="btn btn-primary btn-big" onClick={() => setSession({ reveal: true, voting_open: true })}>Show the CV to everyone and open voting</button>
       <div className="row" style={{ marginTop: 10 }}>
         <button className="btn" onClick={() => setSession({ voting_open: !s.voting_open })}>{s.voting_open ? 'Close voting' : 'Open voting'}</button>
-        <button className="btn" onClick={() => setSession({ round: `cv${patient + 1}`, ...timer(null), voting_open: false })}>Next patient →</button>
+        <button className="btn" onClick={() => setSession({ reveal: !s.reveal })}>{s.reveal ? 'Hide the CV' : 'Show the CV only'}</button>
+        <button className="btn" onClick={() => setSession({ round: `cv${patient + 1}`, ...timer(null), voting_open: false, reveal: false })}>Next patient →</button>
       </div>
     </section>
+    </>
   )
 }
 

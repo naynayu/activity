@@ -8,14 +8,14 @@ A static React + Vite app on Vercel with all room state in Supabase, built the w
 | URL | Who | What |
 | --- | --- | --- |
 | `/` | Participants (phones) | Join with a first name. One step at a time, one thing to do |
-| `/#screen` | Projector | QR code, countdown, live vote bars, rewrites, both CVs, leaderboard, questions |
+| `/#screen` | Projector (optional) | Everything on a big screen, if you have one. Not needed: phones show it all |
 | `/#host` | Facilitator (PIN in `src/config.ts`) | Next and Back, one action per step, more controls underneath |
 
 ## The session: 7 steps
 
 1. **Welcome**: people scan the code and join.
-2. **Hire or Pass**: show a CV for 6 seconds, the room votes.
-3. **Fix the line**: rewrite one weak CV line with a result and a number (60 seconds). Pick the best for +10.
+2. **Hire or Pass**: paste or photograph a patient's CV; it appears on every phone and stays there. The room votes and sees the tally.
+3. **Fix the line**: the CV stays on each phone; everyone rewrites one weak line with a result and a number (60 seconds). Pick the best for +10 and they show on every phone.
 4. **Bad CV vs good CV**: an Executive Assistant example, scored −90 and 100.
 5. **Score your own CV**: tick the checklist and red flags on your phone, send your score.
 6. **Winners**: the leaderboard, hidden until you reveal it. Built for 50+ people.

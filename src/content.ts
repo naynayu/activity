@@ -170,8 +170,8 @@ export interface Step { key: Phase; title: string; say: string; minutes: number 
 /** The whole session in plain words. `say` is the one sentence people see on their phones. */
 export const STEPS: Step[] = [
   { key: 'welcome', title: 'Welcome', say: 'Waiting for the host to start. Keep this page open.', minutes: 5 },
-  { key: 'vote', title: 'Hire or Pass', say: 'Look at the CV on the screen for 6 seconds. Then tap Hire or Pass.', minutes: 15 },
-  { key: 'rewrite', title: 'Fix the line', say: 'Rewrite the weak line so it shows a result and a number.', minutes: 10 },
+  { key: 'vote', title: 'Hire or Pass', say: 'Read the CV below. Would you hire this person? Tap Hire or Pass.', minutes: 15 },
+  { key: 'rewrite', title: 'Fix the line', say: 'Rewrite the weak line from the CV so it shows a result and a number.', minutes: 10 },
   { key: 'compare', title: 'Bad CV vs good CV', say: 'Look at both CVs. What is different?', minutes: 8 },
   { key: 'score', title: 'Score your own CV', say: 'Tick what your CV has, and what it should not have. Then send your score.', minutes: 20 },
   { key: 'winners', title: 'Winners', say: 'The winners are announced here.', minutes: 5 },

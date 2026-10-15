@@ -1,6 +1,7 @@
 import QRCode from 'qrcode'
 import { useEffect, useMemo, useState } from 'react'
 import { Board } from '../components/Board'
+import { CvView, useCv } from '../components/PatientCv'
 import { Questions } from '../components/Questions'
 import { StatusDot } from '../components/Status'
 import { STEPS, stepIndex, useContent } from '../content'
@@ -63,14 +64,15 @@ export function Screen() {
 
 function Vote({ s }: { s: SessionRow }) {
   const votes = useTable<VoteRow>('votes').rows.filter(v => v.round === s.round)
-  const left = useCountdown(s.timer_end)
   const hire = votes.filter(v => v.choice === 'hire').length, pass = votes.length - hire
   const pct = (n: number) => (votes.length ? Math.round((100 * n) / votes.length) : 0)
-  const looking = s.voting_open && left != null && left > 0
+  const cv = useCv(s.round, `${s.reveal}`)
   return (
     <div className="screen-center">
       <div className="muted">Patient {s.round.replace('cv', '')}</div>
-      <div className="huge">{looking ? left : s.voting_open ? 'Vote!' : 'Get ready'}</div>
+      {s.reveal
+        ? <div className="cv-stage"><CvView cv={cv} /></div>
+        : <div className="huge">Get ready</div>}
       <div className="bars">
         <div className="bar"><div className="bar-fill pos-bg" style={{ height: `${pct(hire)}%` }} /><div className="bar-n">👍 {hire}</div></div>
         <div className="bar"><div className="bar-fill neg-bg" style={{ height: `${pct(pass)}%` }} /><div className="bar-n">👎 {pass}</div></div>
