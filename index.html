@@ -35,6 +35,17 @@
   small, .mute { color:var(--mute) }
   input[type=text], input[type=number] { padding:8px; border:1px solid var(--line); border-radius:8px; background:var(--bg); width:100% }
   ol.lead { padding-left:22px; margin:6px 0 0 }
+  .cols { columns:3 220px; column-gap:10px }
+  .pl { display:flex; align-items:center; gap:8px; padding:6px 10px; margin-bottom:6px; border:1px solid var(--line); border-radius:10px; background:var(--card); break-inside:avoid }
+  .pl .rk { width:30px; font-weight:700; color:var(--mute) } .pl .nm { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap } .pl .sc { font-weight:700; font-size:18px }
+  .pl.top { border-color:var(--accent); background:color-mix(in srgb, var(--accent) 12%, var(--card)) }
+  .tv .pl { font-size:22px; padding:10px 14px } .tv .pl .sc { font-size:28px } .tv .cols { columns:3 280px }
+  .tv-btn { position:fixed; right:12px; bottom:12px; z-index:5 }
+  .step { display:flex; gap:10px; align-items:center; padding:10px 12px; border:1px solid var(--line); border-radius:12px; margin-bottom:8px; background:var(--card) }
+  .step.now { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent) } .step.done { opacity:.55; text-decoration:line-through }
+  .step input { width:20px; height:20px }
+  details { border-bottom:1px solid var(--line); padding:8px 0 } summary { cursor:pointer; font-weight:600 }
+  .qa-done summary { opacity:.55; text-decoration:line-through }
 </style>
 </head>
 <body>
@@ -144,7 +155,7 @@ REFEREES
 const SAMPLE_DED = [0,1,2,3,4,5,7,8,9,10,11,12,13,14,15,16], SAMPLE_CHK = [3], SAMPLE_TYPOS = 1;
 
 const KEY = "cv-clinic-board-v1";
-let tab = "score";
+let tab = "plan";
 let st = { chk: new Set(), ded: new Set(), typos: 0, name: "" };
 let board = (() => { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } })();
 let pass = 0, hire = 0, flash = null, flashLeft = 0, flashT = null;
@@ -161,11 +172,63 @@ function verdict(n) {
 }
 const colour = k => `var(--${k})`;
 
-const TABS = [["score","Scorecard"],["practice","Practice CV"],["r1","Round 1"],["r2","Round 2"],["r3","Round 3"],["board","Leaderboard"]];
+const TABS = [["plan","Run of show"],["score","Scorecard"],["practice","Practice CV"],["r1","Round 1"],["r2","Round 2"],["r3","Round 3"],["board","Leaderboard"],["qa","Questions"]];
 function render() {
+  document.body.classList.toggle("tv", tv);
   document.getElementById("nav").innerHTML = TABS.map(([k,l]) => `<button class="${tab===k?"on":""}" onclick="tab='${k}';render()">${l}</button>`).join("");
-  document.getElementById("view").innerHTML = ({score:scoreV, practice:practiceV, r1:r1V, r2:r2V, r3:r3V, board:boardV})[tab]();
+  document.getElementById("view").innerHTML = ({plan:planV, score:scoreV, practice:practiceV, r1:r1V, r2:r2V, r3:r3V, board:boardV, qa:qaV})[tab]();
 }
+
+// ---- persistence for tracker + questions ----
+const KEY2 = "cv-clinic-state-v2";
+let ext = (() => { try { return JSON.parse(localStorage.getItem(KEY2)) || {}; } catch { return {}; } })();
+ext.plan = ext.plan || {}; ext.qa = ext.qa || {}; ext.custom = ext.custom || [];
+const persist = () => { try { localStorage.setItem(KEY2, JSON.stringify(ext)); } catch {} };
+let tv = false;
+
+// ---- activity tracker ----
+const PLAN = [
+  ["Set the scene: music on, cover personal details, applaud the brave", 5],
+  ["Round 1: Hire or Pass (6-second skim, then vote)", 8],
+  ["Round 2: The Diagnosis (room shouts the symptoms)", 8],
+  ["Round 3: The Glow-Up (60-second rewrite, applause meter)", 8],
+  ["Discharge: top two fixes, next patient (4–6 patients, 4–5 min each)", 25],
+  ["Practice round: score the sample CV together", 10],
+  ["Scorecard game: everyone scores their own CV", 20],
+  ["Announce leaderboard and give prizes", 5],
+  ["Questions and answers", 20],
+];
+function planV() {
+  const cur = PLAN.findIndex((_, i) => !ext.plan[i]);
+  const mins = PLAN.reduce((s, p, i) => s + (ext.plan[i] ? 0 : p[1]), 0);
+  return `<div class="card row"><div><h2>Run of show</h2><span class="mute">${PLAN.length - Object.values(ext.plan).filter(Boolean).length} activities left · about ${mins} min remaining</span></div>
+    <button onclick="ext.plan={};persist();render()">Reset</button></div>
+    ${PLAN.map(([t, m], i) => `<label class="step ${ext.plan[i] ? "done" : i === cur ? "now" : ""}">
+      <input type="checkbox" ${ext.plan[i] ? "checked" : ""} onchange="ext.plan[${i}]=this.checked;persist();render()">
+      <span style="flex:1">${esc(t)}</span><span class="mute">${m} min</span></label>`).join("")}`;
+}
+
+// ---- questions to answer afterwards ----
+const QA = [
+  ["Is AI coming for my job?", "AI is coming for tasks, not whole jobs. The person who uses it well keeps the job, and probably gets the next one. You compete with people who do your job with AI. Calculators and Excel are the precedent."],
+  ["I'm not in tech. Do I still need to learn AI?", "Yes, maybe more than tech people. Teachers, HR, marketers, farmers, lawyers and accountants all have tasks AI can speed up."],
+  ["Do I need to learn coding?", "Not to use AI. You need clear thinking and clear writing. Coding helps if you want to build AI tools."],
+  ["Isn't using AI cheating?", "Using AI to avoid learning is cheating yourself. Using it to work faster while understanding the output is a skill. Follow school or employer rules and never submit what you can't explain."],
+  ["Which AI tool should I start with?", "Any major free one. The habit matters more than the tool: pick one and use it daily for a month."],
+  ["Will AI take entry-level jobs from graduates?", "Some entry-level tasks are being automated, so the bar is rising. Proof of work, real projects and AI skills matter more now."],
+  ["I'm a student. Where do I start?", "One skill, one tool, one project. Learn a skill, use AI to help, build something small, and post it."],
+];
+function qaV() {
+  const all = QA.map((q, i) => ({ id: "q" + i, q: q[0], a: q[1] })).concat(ext.custom.map((q, i) => ({ id: "c" + i, q, a: "" })));
+  const left = all.filter(x => !ext.qa[x.id]).length;
+  return `<div class="card"><h2>Questions to answer afterwards</h2><span class="mute">${left} of ${all.length} still to answer. Tap a question for the suggested answer.</span>
+    ${all.map(x => `<details class="${ext.qa[x.id] ? "qa-done" : ""}"><summary>${esc(x.q)}</summary>
+      ${x.a ? `<p>${esc(x.a)}</p>` : `<p class="mute">Audience question: no prepared answer.</p>`}
+      <label><input type="checkbox" ${ext.qa[x.id] ? "checked" : ""} onchange="ext.qa['${x.id}']=this.checked;persist();render()"> Answered</label></details>`).join("")}
+    <div class="row" style="margin-top:12px"><input type="text" id="nq" placeholder="Add a question from the room" style="flex:1" onkeydown="if(event.key==='Enter')addQ()">
+      <button class="primary" onclick="addQ()">Add</button></div></div>`;
+}
+function addQ() { const el = document.getElementById("nq"), v = el.value.trim(); if (!v) return; ext.custom.push(v); persist(); render(); }
 
 function scoreV() {
   const n = total(), [msg, k] = verdict(n);
@@ -250,10 +313,34 @@ function startTm() {
 }
 function resetTm(){ clearInterval(tm.t); tm.left = 60; render(); }
 
+// Leaderboard sized for 50+ players: compact multi-column grid, ties share a rank, big-screen mode.
+function saveBoard() { board.sort((a, b) => b.score - a.score); try { localStorage.setItem(KEY, JSON.stringify(board)); } catch {} }
 function boardV() {
-  return `<div class="card"><h2>Leaderboard</h2>${board.length ? `<ol class="lead">${board.map(b=>`<li>${esc(b.name)}: <b class="${b.score<0?"neg":""}">${b.score}</b></li>`).join("")}</ol>` : `<p class="mute">No scores yet. Save one from the Scorecard tab.</p>`}
-    <div style="margin-top:10px"><button onclick="if(confirm('Clear leaderboard?')){board=[];try{localStorage.removeItem(KEY)}catch{};render()}">Clear</button></div></div>`;
+  saveBoard();
+  const ranks = board.map((b, i) => board.findIndex(x => x.score === b.score) + 1);
+  const list = board.length ? `<div class="cols">${board.map((b, i) => `<div class="pl ${ranks[i] <= 3 ? "top" : ""}">
+      <span class="rk">${ranks[i] === 1 ? "🥇" : ranks[i] === 2 ? "🥈" : ranks[i] === 3 ? "🥉" : ranks[i]}</span>
+      <span class="nm" title="${esc(b.name)}">${esc(b.name)}</span>
+      <span class="sc ${b.score < 0 ? "neg" : ""}">${b.score}</span>
+      ${tv ? "" : `<button class="link" style="padding:2px 6px" onclick="editScore(${i})">✎</button><button style="padding:2px 6px" onclick="delScore(${i})">✕</button>`}</div>`).join("")}</div>`
+    : `<p class="mute">No scores yet. Save one from the Scorecard tab or add one below.</p>`;
+  const avg = board.length ? Math.round(board.reduce((s, b) => s + b.score, 0) / board.length) : 0;
+  return `<button class="tv-btn primary" onclick="tv=!tv;render()">${tv ? "Exit big screen" : "Big screen"}</button>
+    <div class="card row"><h2 style="margin:0">Leaderboard</h2><span class="mute">${board.length} players · average ${avg}${board.length ? ` · top ${board[0].score}` : ""}</span></div>
+    ${list}
+    ${tv ? "" : `<div class="card row" style="margin-top:12px"><input type="text" id="bn" placeholder="Name" style="max-width:240px">
+      <input type="number" id="bs" placeholder="Score" style="max-width:110px" onkeydown="if(event.key==='Enter')quickAdd()">
+      <button class="primary" onclick="quickAdd()">Add</button>
+      <button onclick="if(confirm('Clear the whole leaderboard?')){board=[];saveBoard();render()}">Clear all</button></div>`}`;
 }
+function quickAdd() {
+  const n = document.getElementById("bn"), s = document.getElementById("bs");
+  if (s.value === "") return;
+  board.push({ name: n.value.trim() || "Player " + (board.length + 1), score: parseInt(s.value, 10) });
+  saveBoard(); render(); document.getElementById("bn").focus();
+}
+function editScore(i) { const v = prompt("New score for " + board[i].name, board[i].score); if (v !== null && v.trim() !== "" && !isNaN(v)) { board[i].score = parseInt(v, 10); saveBoard(); render(); } }
+function delScore(i) { board.splice(i, 1); saveBoard(); render(); }
 
 render();
 </script>
