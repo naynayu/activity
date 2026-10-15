@@ -1,8 +1,8 @@
-import { CHECKS } from './content'
+import { getContent, type Content } from './content'
 import type { AwardRow, Participant, ScoreRow } from './types'
 
-export const computeScore = (checks: number[], deds: number[], typos: number) =>
-  checks.reduce((s, i) => s + (CHECKS[i]?.[1] ?? 0), 0) - 5 * (deds.length + typos)
+export const computeScore = (checks: number[], deds: number[], typos: number, c: Content = getContent()) =>
+  checks.reduce((s, i) => s + (c.checks[i]?.[1] ?? 0), 0) - 5 * (deds.length + typos)
 
 export function verdict(n: number): { text: string; tone: 'ok' | 'warn' | 'bad' } {
   if (n >= 85) return { text: 'Ready to send. Start applying this week.', tone: 'ok' }
@@ -14,7 +14,7 @@ export function verdict(n: number): { text: string; tone: 'ok' | 'warn' | 'bad' 
 export interface BoardRow { id: string; name: string; game: number; bonus: number; total: number; rank: number }
 
 /** Game score plus hand-awarded points. Ties share a rank. Only people who have
- *  submitted a score or been awarded points appear. */
+ *  sent a score or been given points appear. */
 export function buildBoard(participants: Participant[], scores: ScoreRow[], awards: AwardRow[]): BoardRow[] {
   const game = new Map(scores.map(s => [s.participant_id, s.score]))
   const bonus = new Map<string, number>()

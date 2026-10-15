@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { forgetMe, measureClockSkew, participantStillExists, readMe } from './data'
+import { forgetMe, participantStillExists, readMe, syncClock } from './data'
 import type { Participant as P } from './types'
 import { Host } from './views/Host'
 import { Join } from './views/Join'
@@ -19,8 +19,9 @@ export function App() {
   useEffect(() => {
     const onHash = () => setRoute(routeFromHash())
     addEventListener('hashchange', onHash)
-    measureClockSkew()
-    return () => removeEventListener('hashchange', onHash)
+    syncClock()
+    const id = setInterval(syncClock, 60000)
+    return () => { removeEventListener('hashchange', onHash); clearInterval(id) }
   }, [])
 
   // Drop a stale identity (e.g. after a reset) before the phone tries to send anything.

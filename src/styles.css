@@ -62,3 +62,14 @@ button, input, select, textarea { font:inherit; color:inherit }
 .skel { background:var(--line); border-radius:12px; animation:p 1.2s infinite } @keyframes p { 50% { opacity:.5 } }
 details { margin:8px 0 } summary { cursor:pointer; font-weight:600 }
 @media (max-width:760px) { .screen-two { grid-template-columns:1fr } .huge { font-size:80px } }
+.say { font-size:18px; margin:0 0 12px }
+.dot { display:inline-flex; align-items:center; gap:6px; vertical-align:middle } .dot i { width:10px; height:10px; border-radius:50%; background:var(--pos); display:inline-block } .dot small { color:var(--warn); font-size:12px }
+.dot-connecting i { background:var(--warn) } .dot-offline i { background:var(--neg) }
+.hostbar { display:flex; justify-content:space-between; align-items:center; gap:10px; position:sticky; top:0; z-index:5; background:var(--bg); padding:8px 0 10px; border-bottom:1px solid var(--line); margin-bottom:12px }
+.now { border-color:var(--accent); border-width:2px }
+.chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px } .chip-btn { border:1px solid var(--line); background:var(--card); border-radius:99px; padding:5px 12px; cursor:pointer; font-size:13px } .chip-btn.on { background:var(--accent); color:var(--accent-ink); border-color:var(--accent) } .chip-btn.done { opacity:.6 }
+.gates { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px }
+.more > summary { font-weight:700; font-size:17px } .more h3 { margin-top:16px }
+.editor .fld, .fld { display:flex; flex-direction:column; gap:4px; margin:10px 0; font-size:14px; color:var(--muted) } .editor textarea { font:13px/1.4 ui-monospace,monospace }
+.btn:disabled, .opt input:disabled { opacity:.5 }
+.screen-head h1 { font-size:clamp(28px,3vw,44px) } .screen { font-size:clamp(18px,1.7vw,26px) }

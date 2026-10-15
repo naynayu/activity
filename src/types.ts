@@ -1,16 +1,24 @@
-export type Phase = 'lobby' | 'hirepass' | 'diagnosis' | 'glowup' | 'practice' | 'compare' | 'scorecard' | 'leaderboard' | 'qa'
+export type Phase = 'welcome' | 'vote' | 'rewrite' | 'compare' | 'score' | 'winners' | 'questions'
+export type PhoneView = 'auto' | 'hold' | 'winners' | 'questions'
 
 export interface SessionRow {
   id: string
   phase: Phase
-  /** Furthest phase index reached, drives the run-of-show ticks. */
+  /** Furthest step reached, for the ticks on the host console. */
   step: number
-  /** Which patient's CV is on screen: cv1, cv2 ... */
+  /** Which patient: cv1, cv2 ... */
   round: string
-  /** Hire or Pass: the CV is showing. Practice: the answer is revealed. */
+  /** Compare: the good CV is revealed. */
   reveal: boolean
   timer_end: string | null
   message: string | null
+  weak_line: string | null
+  voting_open: boolean
+  submit_open: boolean
+  scores_open: boolean
+  questions_open: boolean
+  show_board: boolean
+  phone_view: PhoneView
   updated_at: string
 }
 export interface Participant { id: string; name: string; created_at: string; last_seen: string }

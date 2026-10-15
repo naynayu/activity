@@ -2,194 +2,160 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Board } from '../components/Board'
 import { Questions } from '../components/Questions'
 import { Scorecard, type Card } from '../components/Scorecard'
-import { BAD_EA, COMPARE_NOTES, GOOD_EA, PHASES, SAMPLE_CHK, SAMPLE_DED, SAMPLE_TYPOS, SYMPTOMS, phaseIndex } from '../content'
-import { clock, useCountdown, useRows, useSession } from '../data'
+import { StatusDot } from '../components/Status'
+import { STEPS, stepIndex, useContent } from '../content'
+import { clock, useCountdown, useSession } from '../data'
 import { buildBoard, computeScore } from '../scoring'
-import { sb } from '../supabase'
-import type { AwardRow, Participant as P, ScoreRow, SubmissionRow, VoteRow } from '../types'
-
-type Tab = 'now' | 'qa' | 'board'
+import { dbInsert, dbUpsert, useTable } from '../store'
+import type { AwardRow, Participant as P, ScoreRow, SessionRow, SubmissionRow, VoteRow } from '../types'
 
 export function Participant({ me, onLeave }: { me: P; onLeave: () => void }) {
-  const { session } = useSession()
-  const [tab, setTab] = useState<Tab>('now')
-  if (!session) return <div className="phone"><div className="skel" style={{ height: 120, marginTop: 80 }} /></div>
-  const info = PHASES[Math.max(0, phaseIndex(session.phase))]
+  const s = useSession()
+  const [ask, setAsk] = useState(false)
+  if (!s) return <div className="phone"><div className="skel" style={{ height: 140, marginTop: 80 }} /></div>
+  const step = STEPS[stepIndex(s.phase)]
+  const view = ask ? 'questions' : s.phone_view !== 'auto' ? s.phone_view : null
 
   return (
     <div className="phone">
       <header className="phone-head">
-        <div><b>{me.name}</b><div className="faint small">{info.title}</div></div>
+        <div><b>{me.name}</b> <StatusDot /></div>
         <button className="btn" onClick={onLeave}>Leave</button>
       </header>
-      {session.message && <div className="banner">{session.message}</div>}
-      {tab === 'now' && <Now me={me} />}
-      {tab === 'qa' && <><h2>Questions</h2><Questions mode="phone" me={me} /></>}
-      {tab === 'board' && <BoardTab me={me} />}
+      {s.message && <div className="banner">{s.message}</div>}
+      {view === 'hold' && <div className="card card-lg center"><div className="logo">👀</div><h2>Eyes on the screen</h2></div>}
+      {view === 'winners' && <Winners me={me} s={s} />}
+      {view === 'questions' && <><h2>Questions</h2><Questions mode="phone" me={me} open={s.questions_open} /></>}
+      {!view && (
+        <>
+          <h2>{step.title}</h2>
+          <p className="say">{step.say}</p>
+          {s.phase === 'vote' && <Vote me={me} s={s} />}
+          {s.phase === 'rewrite' && <Rewrite me={me} s={s} />}
+          {s.phase === 'compare' && <Compare s={s} />}
+          {s.phase === 'score' && <Score me={me} s={s} />}
+          {s.phase === 'winners' && <Winners me={me} s={s} />}
+          {s.phase === 'questions' && <Questions mode="phone" me={me} open={s.questions_open} />}
+        </>
+      )}
       <nav className="tabbar">
-        {([['now', 'Now'], ['qa', 'Questions'], ['board', 'Board']] as [Tab, string][]).map(([k, l]) => (
-          <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{l}</button>
-        ))}
+        <button className={!ask ? 'on' : ''} onClick={() => setAsk(false)}>Now</button>
+        <button className={ask ? 'on' : ''} onClick={() => setAsk(true)}>Ask a question</button>
       </nav>
     </div>
   )
 }
 
-function BoardTab({ me }: { me: P }) {
-  const people = useRows<P>('participants', [], 10000)
-  const scores = useRows<ScoreRow>('scores')
-  const awards = useRows<AwardRow>('awards')
-  const rows = useMemo(() => buildBoard(people.rows, scores.rows, awards.rows), [people.rows, scores.rows, awards.rows])
-  const mine = rows.find(r => r.id === me.id)
-  return (
-    <>
-      <h2>Leaderboard</h2>
-      {mine ? <div className="card center"><div className="big">#{mine.rank}</div><div className="muted">{mine.total} points · {rows.length} players</div></div>
-        : <p className="muted">Submit your scorecard to join the leaderboard.</p>}
-      <Board rows={rows} meId={me.id} limit={10} />
-    </>
-  )
-}
+const Closed = ({ text }: { text: string }) => <div className="card center muted">🔒 {text}</div>
 
-function Now({ me }: { me: P }) {
-  const { session } = useSession()
-  if (!session) return null
-  switch (session.phase) {
-    case 'hirepass': return <HirePass me={me} />
-    case 'diagnosis': return <Diagnosis />
-    case 'glowup': return <GlowUp me={me} />
-    case 'practice': return <Practice />
-    case 'compare': return <Compare />
-    case 'scorecard': return <ScoreGame me={me} />
-    case 'leaderboard': return <BoardTab me={me} />
-    case 'qa': return <><h2>Questions</h2><Questions mode="phone" me={me} /></>
-    default: return <div className="card card-lg center"><div className="logo">🩺</div><h2>Welcome to the CV Clinic</h2><p className="muted">Hang tight. The host will start the next round. You can ask a question any time from the Questions tab.</p></div>
-  }
-}
-
-function HirePass({ me }: { me: P }) {
-  const { session } = useSession()
-  const round = session?.round ?? 'cv1'
-  const votes = useRows<VoteRow>('votes', [['round', round], ['participant_id', me.id]], 4000)
-  const left = useCountdown(session?.timer_end)
-  const mine = votes.rows[0]?.choice
+function Vote({ me, s }: { me: P; s: SessionRow }) {
+  const votes = useTable<VoteRow>('votes').rows
+  const left = useCountdown(s.timer_end)
+  const [err, setErr] = useState('')
+  const mine = votes.find(v => v.participant_id === me.id && v.round === s.round)?.choice
   async function vote(choice: 'hire' | 'pass') {
-    await sb.from('votes').upsert({ participant_id: me.id, round, choice })
-    votes.refetch()
+    setErr('')
+    const r = await dbUpsert('votes', { participant_id: me.id, round: s.round, choice })
+    if (!r.ok) setErr('Voting is closed.')
   }
-  const showing = !!session?.reveal && left != null && left > 0
+  const looking = left != null && left > 0 && s.voting_open
   return (
     <>
-      <h2>Hire or Pass</h2>
       <div className="card center">
-        <div className="muted">{round.replace('cv', 'Patient ')}</div>
-        <div className="big">{showing ? left : session?.reveal ? 'Vote now' : 'Get ready'}</div>
-        <p className="muted small">You get 6 seconds to skim. Then decide.</p>
+        <div className="muted">Patient {s.round.replace('cv', '')}</div>
+        <div className="big">{looking ? left : s.voting_open ? 'Vote now' : 'Get ready'}</div>
       </div>
+      {!s.voting_open && !mine && <Closed text="Voting opens when the host shows the CV." />}
       <div className="two">
-        <button className={`btn btn-big vote ${mine === 'hire' ? 'btn-primary' : ''}`} onClick={() => vote('hire')}>👍 Hire</button>
-        <button className={`btn btn-big vote ${mine === 'pass' ? 'btn-primary' : ''}`} onClick={() => vote('pass')}>👎 Pass</button>
+        <button className={`btn btn-big vote ${mine === 'hire' ? 'btn-primary' : ''}`} disabled={!s.voting_open} onClick={() => vote('hire')}>👍 Hire</button>
+        <button className={`btn btn-big vote ${mine === 'pass' ? 'btn-primary' : ''}`} disabled={!s.voting_open} onClick={() => vote('pass')}>👎 Pass</button>
       </div>
-      {mine && <p className="center muted">Voted {mine}. You can change it.</p>}
+      {mine && <p className="center muted">You voted {mine}.{s.voting_open ? ' You can change it.' : ''}</p>}
+      {err && <p className="center neg">{err}</p>}
     </>
   )
 }
 
-function Diagnosis() {
-  return (
-    <>
-      <h2>The Diagnosis</h2>
-      <p className="muted">Spot the symptoms on screen and shout them out.</p>
-      {SYMPTOMS.map(([n, m, c]) => (
-        <div key={n} className="card"><b>{n}</b><div className="muted">{m}</div><div className="pos small">Cure: {c}</div></div>
-      ))}
-    </>
-  )
-}
-
-function GlowUp({ me }: { me: P }) {
-  const { session } = useSession()
-  const round = session?.round ?? 'cv1'
-  const subs = useRows<SubmissionRow>('submissions', [['participant_id', me.id], ['round', round]], 5000)
-  const left = useCountdown(session?.timer_end)
+function Rewrite({ me, s }: { me: P; s: SessionRow }) {
+  const subs = useTable<SubmissionRow>('submissions').rows.filter(x => x.participant_id === me.id && x.round === s.round)
+  const left = useCountdown(s.timer_end)
   const [text, setText] = useState('')
-  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const open = s.submit_open && (left == null || left > 0)
   async function send() {
     const t = text.trim()
-    if (!t || busy) return
-    setBusy(true)
-    await sb.from('submissions').insert({ participant_id: me.id, round, content: t })
-    setText(''); setBusy(false); subs.refetch()
+    if (!t) return
+    setErr('')
+    const r = await dbInsert('submissions', [{ id: crypto.randomUUID(), participant_id: me.id, round: s.round, content: t, picked: false, created_at: new Date().toISOString() }])
+    if (r.ok) setText(''); else setErr('Time is up, or the host has closed this.')
   }
   return (
     <>
-      <h2>The Glow-Up</h2>
-      <div className="card center"><div className="big">{left == null ? '60s' : clock(left)}</div><p className="muted">Rewrite the weakest bullet with a result and a number.</p></div>
+      <div className="card center"><div className="muted">Rewrite this line</div><h3 style={{ margin: '6px 0' }}>“{s.weak_line || 'The host will show the line'}”</h3>
+        {left != null && <div className="big">{clock(left)}</div>}</div>
+      {!open && <Closed text={left === 0 ? 'Time is up.' : 'Opens when the host starts the timer.'} />}
       <div className="card">
-        <textarea className="input" rows={4} maxLength={400} placeholder="Managed filing for 300+ client records and cut retrieval time from 15 minutes to under 5." value={text} onChange={e => setText(e.target.value)} />
-        <button className="btn btn-primary btn-big" disabled={!text.trim() || busy} onClick={send}>Submit rewrite</button>
+        <textarea className="input" rows={4} maxLength={400} disabled={!open} placeholder="Example: Managed 300+ client files and cut search time from 15 minutes to under 5." value={text} onChange={e => setText(e.target.value)} />
+        {err && <p className="neg small">{err}</p>}
+        <button className="btn btn-primary btn-big" disabled={!text.trim() || !open} onClick={send}>Send my rewrite</button>
       </div>
-      {subs.rows.map(s => <div key={s.id} className={`card ${s.picked ? 'picked' : ''}`}>{s.content}{s.picked && <div className="pos small">Picked by the host 🎉</div>}</div>)}
+      {subs.map(x => <div key={x.id} className={`card ${x.picked ? 'picked' : ''}`}>{x.content}{x.picked && <div className="pos small">Picked by the host 🎉</div>}</div>)}
     </>
   )
 }
 
-function Practice() {
-  const { session } = useSession()
-  const [card, setCard] = useState<Card>({ checks: [], deds: [], typos: 0 })
-  const answer = computeScore(SAMPLE_CHK, SAMPLE_DED, SAMPLE_TYPOS)
+function Compare({ s }: { s: SessionRow }) {
+  const c = useContent()
   return (
     <>
-      <h2>Practice: score Seun’s CV</h2>
-      <p className="muted">Look at the screen. This one is not saved.</p>
-      {session?.reveal && <div className="card tone-warn center"><b>The room’s answer: {answer}</b><div className="muted small">5 points earned, 17 red flags × −5</div></div>}
-      <Scorecard card={card} onChange={setCard} />
+      <h3 className="neg">The bad CV</h3><pre className="cv">{c.bad.text}</pre>
+      {s.reveal
+        ? <><h3 className="pos">The good CV</h3><pre className="cv">{c.good.text}</pre>
+            {c.notes.map(([b, g]) => <div key={b} className="card"><div className="neg small">{b}</div><div className="pos">{g}</div></div>)}</>
+        : <p className="center muted">The good CV appears when the host reveals it.</p>}
     </>
   )
 }
 
-function ScoreGame({ me }: { me: P }) {
-  const saved = useRows<ScoreRow>('scores', [['participant_id', me.id]], 5000)
+function Score({ me, s }: { me: P; s: SessionRow }) {
+  const c = useContent()
+  const saved = useTable<ScoreRow>('scores').rows.find(r => r.participant_id === me.id)
   const [card, setCard] = useState<Card>({ checks: [], deds: [], typos: 0 })
-  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
   const loaded = useRef(false)
-  const row = saved.rows[0]
-  useEffect(() => {
-    if (row && !loaded.current) { loaded.current = true; setCard({ checks: row.checks, deds: row.deds, typos: row.typos }) }
-  }, [row])
-  const total = computeScore(card.checks, card.deds, card.typos)
+  useEffect(() => { if (saved && !loaded.current) { loaded.current = true; setCard({ checks: saved.checks, deds: saved.deds, typos: saved.typos }) } }, [saved])
+  const total = computeScore(card.checks, card.deds, card.typos, c)
   async function submit() {
-    setBusy(true)
-    await sb.from('scores').upsert({ participant_id: me.id, score: total, checks: card.checks, deds: card.deds, typos: card.typos, updated_at: new Date().toISOString() })
-    saved.refetch(); setBusy(false)
+    setErr('')
+    const r = await dbUpsert('scores', { participant_id: me.id, score: total, checks: card.checks, deds: card.deds, typos: card.typos, updated_at: new Date().toISOString() })
+    if (!r.ok) setErr('Scores are closed.')
   }
   return (
     <>
-      <h2>Score your own CV</h2>
-      <p className="muted">Go through each line with your CV open. Submit when you’re done; you can resubmit.</p>
+      {!s.scores_open && <Closed text="You can send your score when the host opens it. You can still tick things now." />}
       <Scorecard card={card} onChange={setCard} />
+      {err && <p className="center neg">{err}</p>}
       <div className="submitbar">
-        <button className="btn btn-primary btn-big" disabled={busy} onClick={submit}>
-          {row ? (row.score === total ? `Submitted: ${row.score}` : `Update score to ${total}`) : `Submit score ${total}`}
+        <button className="btn btn-primary btn-big" disabled={!s.scores_open} onClick={submit}>
+          {saved ? (saved.score === total ? `Sent: ${saved.score} ✓` : `Update my score to ${total}`) : `Send my score: ${total}`}
         </button>
       </div>
     </>
   )
 }
 
-function Compare() {
-  const { session } = useSession()
+function Winners({ me, s }: { me: P; s: SessionRow }) {
+  const people = useTable<P>('participants').rows
+  const scores = useTable<ScoreRow>('scores').rows
+  const awards = useTable<AwardRow>('awards').rows
+  const rows = useMemo(() => buildBoard(people, scores, awards), [people, scores, awards])
+  if (!s.show_board) return <div className="card card-lg center"><div className="logo">🥁</div><h2>Winners coming up</h2><p className="muted">The host will reveal the leaderboard.</p></div>
+  const mine = rows.find(r => r.id === me.id)
   return (
     <>
-      <h2>Terrible vs good CV</h2>
-      <p className="muted">Executive assistant. Spot every red flag on the first one.</p>
-      <pre className="cv">{BAD_EA}</pre>
-      {session?.reveal
-        ? <>
-            <h2>The good one</h2><pre className="cv">{GOOD_EA}</pre>
-            {COMPARE_NOTES.map(([b, g]) => <div key={b} className="card"><div className="neg small">{b}</div><div className="pos">{g}</div></div>)}
-          </>
-        : <p className="center muted">The good CV appears when the host reveals it.</p>}
+      {mine ? <div className="card center"><div className="big">#{mine.rank}</div><div className="muted">{mine.total} points · {rows.length} players</div></div>
+        : <p className="muted">Send your score to join the leaderboard.</p>}
+      <Board rows={rows} meId={me.id} limit={10} />
     </>
   )
 }
