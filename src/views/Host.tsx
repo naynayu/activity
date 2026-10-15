@@ -145,7 +145,7 @@ function Toggle({ label, on, onLabel, offLabel, set }: { label: string; on: bool
 
 const timer = (sec: number | null) => ({ timer_end: sec == null ? null : new Date(serverNow() + sec * 1000).toISOString() })
 
-function CvSlot({ round }: { round: string }) {
+function CvSlot({ round, onSaved }: { round: string; onSaved: () => void }) {
   const c = useContent()
   const saved = useCv(round, 'host')
   const [text, setText] = useState('')
@@ -158,12 +158,14 @@ function CvSlot({ round }: { round: string }) {
     const rows = c.samples.map((x, i) => ({ round: `cv${i + 1}`, text: x.text, image: null, updated_at: new Date().toISOString() }))
     const { error } = await sb.from('cvs').upsert(rows)
     if (!error) { setSession({ weak_line: c.samples[n - 1]?.weak ?? c.samples[0].weak }); setText(c.samples[n - 1]?.text ?? ''); setImage(null) }
+    if (!error) onSaved()
     setMsg(error ? 'Could not load them.' : `Loaded ${rows.length} sample CVs. Patient ${n} is ready. “Next patient” moves to the next one.`)
   }
   async function save() {
     const body = image ? null : (hide ? maskContacts(text) : text).trim() || null
     const { error } = await sb.from('cvs').upsert({ round, text: body, image, updated_at: new Date().toISOString() })
     setMsg(error ? 'Could not save.' : 'Saved. Every phone shows it when you press Show.')
+    if (!error) onSaved()
   }
   return (
     <section className="card">
@@ -189,19 +191,26 @@ function CvSlot({ round }: { round: string }) {
 
 function VoteControls({ s }: { s: SessionRow }) {
   const c = useContent()
+  const [saved, setSaved] = useState<number[]>([])
+  const refreshRounds = () => { sb.from('cvs').select('round,text,image').then(({ data }) => setSaved((data ?? []).filter(r => r.text || r.image).map(r => Number(String(r.round).replace('cv', ''))))) }
+  useEffect(refreshRounds, [s.round])
   const votes = useTable<VoteRow>('votes').rows.filter(v => v.round === s.round)
   const patient = Number(s.round.replace('cv', '')) || 1
   const hire = votes.filter(v => v.choice === 'hire').length
+  /** Patients run up to the last CV that has been added, never past it. */
+  const last = Math.max(c.samples.length, ...saved, 1)
+  const goPatient = (n: number) => setSession({ round: `cv${n}`, timer_end: null, voting_open: false, reveal: false, ...(c.samples[n - 1] ? { weak_line: c.samples[n - 1].weak } : {}) })
   return (
     <>
-    <CvSlot round={s.round} />
+    <CvSlot round={s.round} onSaved={refreshRounds} />
     <section className="card">
-      <div className="row"><b>Patient {patient}</b><span><b className="pos">👍 {hire}</b> · <b className="neg">👎 {votes.length - hire}</b></span></div>
+      <div className="row"><b>Patient {patient} of {last}</b><span><b className="pos">👍 {hire}</b> · <b className="neg">👎 {votes.length - hire}</b></span></div>
       <button className="btn btn-primary btn-big" onClick={() => setSession({ reveal: true, voting_open: true })}>Show the CV to everyone and open voting</button>
       <div className="row" style={{ marginTop: 10 }}>
         <button className="btn" onClick={() => setSession({ voting_open: !s.voting_open })}>{s.voting_open ? 'Close voting' : 'Open voting'}</button>
         <button className="btn" onClick={() => setSession({ reveal: !s.reveal })}>{s.reveal ? 'Hide the CV' : 'Show the CV only'}</button>
-        <button className="btn" onClick={() => setSession({ round: `cv${patient + 1}`, ...timer(null), voting_open: false, reveal: false, ...(c.samples[patient] ? { weak_line: c.samples[patient].weak } : {}) })}>Next patient →</button>
+        <button className="btn" disabled={patient <= 1} onClick={() => goPatient(patient - 1)}>← Previous patient</button>
+        <button className="btn" disabled={patient >= last} onClick={() => goPatient(patient + 1)}>{patient >= last ? 'That was the last CV' : 'Next patient →'}</button>
       </div>
     </section>
     </>
