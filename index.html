@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CV Activities</title>
+<style>
+  :root { --bg:#f7f7f5; --card:#fff; --ink:#1c1c1a; --mute:#6b6b66; --line:#e3e3de; --accent:#2f5d50; --warn:#b45309; --ok:#15803d; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#161615; --card:#201f1e; --ink:#ecebe6; --mute:#9a9992; --line:#33322f; --accent:#6fb59f; --warn:#f59e0b; --ok:#4ade80; }
+  }
+  * { box-sizing:border-box }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.5 system-ui,sans-serif }
+  main { max-width:860px; margin:0 auto; padding:24px 16px 64px }
+  h1 { font-size:22px; margin:0 0 4px } p.sub { color:var(--mute); margin:0 0 20px }
+  .tabs { display:flex; gap:8px; margin-bottom:16px; flex-wrap:wrap }
+  button, select, input, textarea { font:inherit; color:inherit }
+  button { border:1px solid var(--line); background:var(--card); padding:7px 12px; border-radius:8px; cursor:pointer }
+  button.primary, .tabs button.on { background:var(--accent); color:#fff; border-color:var(--accent) }
+  button.link { border:0; background:none; color:var(--mute); padding:2px 6px }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin-bottom:12px }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:space-between }
+  .tag { font-size:12px; padding:2px 8px; border-radius:99px; border:1px solid var(--line); color:var(--mute) }
+  form { display:grid; grid-template-columns:1fr 1fr; gap:10px }
+  form .full { grid-column:1/-1 }
+  label { display:flex; flex-direction:column; gap:3px; font-size:13px; color:var(--mute) }
+  input, select, textarea { padding:8px; border:1px solid var(--line); border-radius:8px; background:var(--bg) }
+  textarea { min-height:80px; resize:vertical }
+  .flags { margin:8px 0 0; padding:0; list-style:none; font-size:13px; color:var(--warn) }
+  .good { color:var(--ok); font-size:13px }
+  .score { font-weight:600 }
+  .filters { display:flex; gap:8px; margin-bottom:12px; flex-wrap:wrap }
+  pre { white-space:pre-wrap; background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px }
+  .empty { color:var(--mute); text-align:center; padding:32px 0 }
+  @media (max-width:560px) { form { grid-template-columns:1fr } }
+</style>
+</head>
+<body>
+<main>
+  <h1>CV Activities</h1>
+  <p class="sub">Log what you've done, review how strong each entry reads, and export what goes on your CV.</p>
+  <div class="tabs" id="tabs"></div>
+  <div id="view"></div>
+</main>
+
+<script>
+const CATS = ["Work", "Project", "Volunteering", "Leadership", "Education", "Award", "Other"];
+const VERBS = /^(led|built|designed|launched|created|managed|organised|organized|developed|improved|increased|reduced|delivered|founded|taught|mentored|wrote|analysed|analyzed|implemented|coordinated|won|grew|saved|shipped|ran|started)/i;
+const KEY = "cv-activities-v1";
+
+let items = load();
+let tab = "log", filter = "all", editing = null;
+
+function load() { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(items)); } catch {} }
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const bullets = a => a.description.split("\n").map(s => s.replace(/^[-•*]\s*/, "").trim()).filter(Boolean);
+
+// Review heuristics: flag weak spots on each entry
+function review(a) {
+  const b = bullets(a), flags = []; let score = 0;
+  if (a.title && a.org) score += 20; else flags.push("Add a role/title and organisation");
+  if (a.start) score += 10; else flags.push("Add dates");
+  if (b.length >= 2) score += 20; else flags.push("Use 2–4 bullet points");
+  if (b.length && b.every(x => VERBS.test(x))) score += 20; else if (b.length) flags.push("Start each bullet with a strong action verb");
+  if (b.some(x => /\d/.test(x))) score += 20; else flags.push("Quantify impact (numbers, %, team size)");
+  if (b.every(x => x.length <= 160)) score += 10; else flags.push("Shorten bullets over ~160 characters");
+  return { score, flags };
+}
+
+function fmtDates(a) { return a.start ? `${a.start} – ${a.current ? "Present" : (a.end || "")}` : ""; }
+
+function render() {
+  document.getElementById("tabs").innerHTML = [["log","Activities"],["add", editing ? "Edit" : "Add"],["export","CV export"]]
+    .map(([k,l]) => `<button class="${tab===k?"on":""}" onclick="go('${k}')">${l}</button>`).join("");
+  const v = document.getElementById("view");
+  if (tab === "add") return v.innerHTML = formHtml();
+  if (tab === "export") return v.innerHTML = exportHtml();
+  v.innerHTML = listHtml();
+}
+function go(t) { if (t !== "add") editing = null; tab = t; render(); }
+
+function listHtml() {
+  const shown = items.filter(a => filter === "all" || a.cat === filter);
+  const filters = `<div class="filters"><select onchange="filter=this.value;render()">
+    <option value="all">All categories</option>${CATS.map(c=>`<option ${filter===c?"selected":""}>${c}</option>`).join("")}</select></div>`;
+  if (!shown.length) return filters + `<div class="empty">No activities yet. Use <b>Add</b> to log your first one.</div>`;
+  return filters + shown.map(a => {
+    const r = review(a);
+    return `<div class="card">
+      <div class="row"><div><b>${esc(a.title)}</b> · ${esc(a.org)}<div class="sub" style="margin:0;color:var(--mute);font-size:13px">${esc(fmtDates(a))}</div></div>
+        <div><span class="tag">${esc(a.cat)}</span> <span class="score">${r.score}/100</span></div></div>
+      <ul>${bullets(a).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+      ${r.flags.length ? `<ul class="flags">${r.flags.map(f=>`<li>⚠ ${esc(f)}</li>`).join("")}</ul>` : `<div class="good">✓ Looks CV-ready</div>`}
+      <div class="row" style="margin-top:8px">
+        <label style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" ${a.onCv?"checked":""} onchange="toggle('${a.id}')"> Include on CV</label>
+        <span><button class="link" onclick="edit('${a.id}')">Edit</button><button class="link" onclick="del('${a.id}')">Delete</button></span>
+      </div></div>`;
+  }).join("");
+}
+
+function formHtml() {
+  const a = items.find(x => x.id === editing) || { cat:"Work", onCv:true };
+  return `<form onsubmit="submitForm(event)" class="card">
+    <label>Role / title<input name="title" required value="${esc(a.title)}"></label>
+    <label>Organisation<input name="org" required value="${esc(a.org)}"></label>
+    <label>Category<select name="cat">${CATS.map(c=>`<option ${a.cat===c?"selected":""}>${c}</option>`).join("")}</select></label>
+    <label>Start<input type="month" name="start" value="${esc(a.start)}"></label>
+    <label>End<input type="month" name="end" value="${esc(a.end)}"></label>
+    <label style="flex-direction:row;align-items:center;gap:6px;align-self:end"><input type="checkbox" name="current" ${a.current?"checked":""}> Ongoing</label>
+    <label class="full">What you did (one bullet per line)<textarea name="description" placeholder="Led a team of 5 to launch…">${esc(a.description)}</textarea></label>
+    <div class="full row"><span></span><span><button type="button" onclick="go('log')">Cancel</button> <button class="primary">Save</button></span></div>
+  </form>`;
+}
+
+function submitForm(e) {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const data = { title:f.get("title").trim(), org:f.get("org").trim(), cat:f.get("cat"), start:f.get("start"), end:f.get("end"), current:f.has("current"), description:f.get("description") };
+  if (editing) Object.assign(items.find(x => x.id === editing), data);
+  else items.unshift({ id: crypto.randomUUID(), onCv:true, ...data });
+  save(); editing = null; go("log");
+}
+function edit(id) { editing = id; tab = "add"; render(); }
+function del(id) { if (confirm("Delete this activity?")) { items = items.filter(x => x.id !== id); save(); render(); } }
+function toggle(id) { const a = items.find(x => x.id === id); a.onCv = !a.onCv; save(); }
+
+function exportText() {
+  const picked = items.filter(a => a.onCv).sort((a,b) => (b.current?"9999":b.end||"").localeCompare(a.current?"9999":a.end||""));
+  return CATS.map(c => {
+    const g = picked.filter(a => a.cat === c); if (!g.length) return "";
+    return `${c.toUpperCase()}\n` + g.map(a => `${a.title}, ${a.org}${a.start ? " (" + fmtDates(a) + ")" : ""}\n` + bullets(a).map(x => `  • ${x}`).join("\n")).join("\n\n");
+  }).filter(Boolean).join("\n\n");
+}
+function exportHtml() {
+  const t = exportText();
+  return t ? `<div class="row" style="margin-bottom:8px"><span class="sub" style="margin:0">Entries ticked “Include on CV”</span><button class="primary" onclick="copyOut()">Copy</button></div><pre id="out">${esc(t)}</pre>`
+           : `<div class="empty">Nothing selected. Tick “Include on CV” on some activities.</div>`;
+}
+function copyOut() { navigator.clipboard?.writeText(exportText()); }
+
+render();
+</script>
+</body>
+</html>
