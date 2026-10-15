@@ -1,4 +1,4 @@
-export type Phase = 'welcome' | 'vote' | 'rewrite' | 'compare' | 'score' | 'winners' | 'questions'
+export type Phase = 'welcome' | 'vote' | 'rewrite' | 'compare' | 'score' | 'quiz' | 'winners'
 export type PhoneView = 'auto' | 'hold' | 'winners' | 'questions'
 
 export interface SessionRow {
@@ -18,6 +18,8 @@ export interface SessionRow {
   scores_open: boolean
   questions_open: boolean
   show_board: boolean
+  quiz_open: boolean
+  quiz_reveal: boolean
   phone_view: PhoneView
   updated_at: string
 }
@@ -28,3 +30,4 @@ export interface ScoreRow { participant_id: string; score: number; checks: numbe
 export interface AwardRow { id: string; participant_id: string; points: number; reason: string | null; created_at: string }
 export interface QuestionRow { id: string; participant_id: string | null; text: string; answered: boolean; created_at: string }
 export interface QVoteRow { question_id: string; participant_id: string }
+export interface AnswerRow { participant_id: string; q: number; choice: number; updated_at: string }

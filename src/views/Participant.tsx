@@ -4,11 +4,11 @@ import { CvView, useCv } from '../components/PatientCv'
 import { Questions } from '../components/Questions'
 import { Scorecard, type Card } from '../components/Scorecard'
 import { StatusDot } from '../components/Status'
-import { STEPS, stepIndex, useContent } from '../content'
+import { QUIZ_POINTS, STEPS, stepIndex, useContent } from '../content'
 import { clock, useCountdown, useSession } from '../data'
-import { buildBoard, computeScore } from '../scoring'
+import { buildBoard, computeScore, quizPoints } from '../scoring'
 import { dbInsert, dbUpsert, useTable } from '../store'
-import type { AwardRow, Participant as P, ScoreRow, SessionRow, SubmissionRow, VoteRow } from '../types'
+import type { AnswerRow, AwardRow, Participant as P, ScoreRow, SessionRow, SubmissionRow, VoteRow } from '../types'
 
 export function Participant({ me, onLeave }: { me: P; onLeave: () => void }) {
   const s = useSession()
@@ -35,8 +35,8 @@ export function Participant({ me, onLeave }: { me: P; onLeave: () => void }) {
           {s.phase === 'rewrite' && <Rewrite me={me} s={s} />}
           {s.phase === 'compare' && <Compare s={s} />}
           {s.phase === 'score' && <Score me={me} s={s} />}
+          {s.phase === 'quiz' && <Quiz me={me} s={s} />}
           {s.phase === 'winners' && <Winners me={me} s={s} />}
-          {s.phase === 'questions' && <Questions mode="phone" me={me} open={s.questions_open} />}
         </>
       )}
       <nav className="tabbar">
@@ -164,14 +164,61 @@ function Winners({ me, s }: { me: P; s: SessionRow }) {
   const people = useTable<P>('participants').rows
   const scores = useTable<ScoreRow>('scores').rows
   const awards = useTable<AwardRow>('awards').rows
-  const rows = useMemo(() => buildBoard(people, scores, awards), [people, scores, awards])
+  const answers = useTable<AnswerRow>('answers').rows
+  const c = useContent()
+  const rows = useMemo(() => buildBoard(people, scores, awards, answers, c), [people, scores, awards, answers, c])
   if (!s.show_board) return <div className="card card-lg center"><div className="logo">🥁</div><h2>Winners coming up</h2><p className="muted">The host will reveal the leaderboard.</p></div>
   const mine = rows.find(r => r.id === me.id)
   return (
     <>
-      {mine ? <div className="card center"><div className="big">#{mine.rank}</div><div className="muted">{mine.total} points · {rows.length} players</div></div>
+      {mine ? <div className="card center"><div className="big">#{mine.rank}</div><div className="muted">{mine.total} points · {rows.length} players</div>
+          <div className="muted small">CV score {mine.game} + quiz {mine.quiz}{mine.bonus ? ` + bonus ${mine.bonus}` : ''}</div></div>
         : <p className="muted">Send your score to join the leaderboard.</p>}
       <Board rows={rows} meId={me.id} limit={10} />
+    </>
+  )
+}
+
+function Quiz({ me, s }: { me: P; s: SessionRow }) {
+  const c = useContent()
+  const mine = useTable<AnswerRow>('answers').rows.filter(a => a.participant_id === me.id)
+  const [err, setErr] = useState('')
+  const picked = (q: number) => mine.find(a => a.q === q)?.choice
+  async function pick(q: number, choice: number) {
+    setErr('')
+    const r = await dbUpsert('answers', { participant_id: me.id, q, choice, updated_at: new Date().toISOString() })
+    if (!r.ok) setErr('The quiz is closed.')
+  }
+  const total = c.quiz.length * QUIZ_POINTS
+  return (
+    <>
+      <div className="card center">
+        {s.quiz_reveal
+          ? <><div className="big">{quizPoints(mine, c)}<small> / {total}</small></div><div className="muted">Your quiz score</div></>
+          : <><div className="big">{mine.length}<small> / {c.quiz.length}</small></div><div className="muted">answered · {QUIZ_POINTS} points each</div></>}
+      </div>
+      {!s.quiz_open && !s.quiz_reveal && <Closed text="The quiz opens when the host starts it. You can read the questions now." />}
+      {s.quiz_open && <p className="center muted small">You can change an answer until the host closes the quiz.</p>}
+      {err && <p className="center neg">{err}</p>}
+      {c.quiz.map((item, qi) => {
+        const choice = picked(qi)
+        return (
+          <div key={qi} className="card">
+            <b>{qi + 1}. {item.q}</b>
+            {item.options.map((o, oi) => {
+              const right = s.quiz_reveal && oi === item.answer
+              const wrong = s.quiz_reveal && choice === oi && oi !== item.answer
+              return (
+                <button key={oi} disabled={!s.quiz_open} onClick={() => pick(qi, oi)}
+                  className={`btn opt-btn ${choice === oi && !s.quiz_reveal ? 'btn-primary' : ''} ${right ? 'opt-right' : ''} ${wrong ? 'opt-wrong' : ''}`}>
+                  {String.fromCharCode(65 + oi)}. {o}{right ? ' ✓' : ''}{wrong ? ' ✗' : ''}
+                </button>
+              )
+            })}
+            {s.quiz_reveal && <p className="small muted" style={{ margin: '8px 0 0' }}>{choice == null ? 'You did not answer. ' : ''}{item.why}</p>}
+          </div>
+        )
+      })}
     </>
   )
 }

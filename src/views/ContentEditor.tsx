@@ -13,6 +13,7 @@ export function ContentEditor() {
   const [deds, setDeds] = useState(c.deds.join('\n'))
   const [glow, setGlow] = useState(c.glow.map(([a, b]) => `${a} | ${b}`).join('\n'))
   const [notes, setNotes] = useState(c.notes.map(([a, b]) => `${a} | ${b}`).join('\n'))
+  const [quiz, setQuiz] = useState(c.quiz.map(x => [x.q, ...x.options, String.fromCharCode(65 + x.answer), x.why].join(' | ')).join('\n'))
   const [qa, setQa] = useState(c.qa.map(([a, b]) => `${a} | ${b}`).join('\n'))
   const [bad, setBad] = useState(cvState(c.bad))
   const [good, setGood] = useState(cvState(c.good))
@@ -24,6 +25,7 @@ export function ContentEditor() {
       deds: lines(deds),
       glow: lines(glow).map(pair), notes: lines(notes).map(pair), qa: lines(qa).map(pair),
       bad: cvFrom(bad), good: cvFrom(good), samples: c.samples,
+      quiz: lines(quiz).map(l => { const p = l.split('|').map(x => x.trim()); const opts = p.slice(1, -2); return { q: p[0], options: opts, answer: Math.max(0, Math.min(opts.length - 1, (p[p.length - 2] || 'A').toUpperCase().charCodeAt(0) - 65)), why: p[p.length - 1] } }),
     }
     const r = await dbUpsert('content', { id: 'v1', data, updated_at: new Date().toISOString() })
     setMsg(r.ok ? 'Saved. Every phone and the projector use it now.' : 'Could not save.')
@@ -35,6 +37,7 @@ export function ContentEditor() {
       <Field label="Red flags (−5 each)" v={deds} set={setDeds} />
       <Field label="Rewrite examples: before | after" v={glow} set={setGlow} />
       <Field label="Bad vs good notes: bad | good" v={notes} set={setNotes} />
+      <Field label="Quiz (10 points each): question | A | B | C | D | right letter | why" v={quiz} set={setQuiz} />
       <Field label="Prepared questions: question | answer" v={qa} set={setQa} />
       <CvField title="The bad CV" v={bad} set={setBad} />
       <CvField title="The good CV" v={good} set={setGood} />

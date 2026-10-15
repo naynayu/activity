@@ -10,7 +10,7 @@ import { clock, serverNow, setSession, useCountdown, useSession } from '../data'
 import { buildBoard } from '../scoring'
 import { dbDelete, dbInsert, refreshAll, useTable } from '../store'
 import { sb } from '../supabase'
-import type { AwardRow, Participant, PhoneView, QuestionRow, ScoreRow, SessionRow, SubmissionRow, VoteRow } from '../types'
+import type { AnswerRow, AwardRow, Participant, PhoneView, QuestionRow, ScoreRow, SessionRow, SubmissionRow, VoteRow } from '../types'
 import { ContentEditor } from './ContentEditor'
 
 const ZERO = '00000000-0000-0000-0000-000000000000'
@@ -37,7 +37,9 @@ function Console() {
   const people = useTable<Participant>('participants').rows
   const scores = useTable<ScoreRow>('scores').rows
   const awards = useTable<AwardRow>('awards').rows
-  const board = useMemo(() => buildBoard(people, scores, awards), [people, scores, awards])
+  const answers = useTable<AnswerRow>('answers').rows
+  const c = useContent()
+  const board = useMemo(() => buildBoard(people, scores, awards, answers, c), [people, scores, awards, answers, c])
   const [share, setShare] = useState(false)
   if (!s) return <div className="phone"><p>Loading…</p></div>
 
@@ -49,7 +51,7 @@ function Console() {
     setSession({
       phase: t.key, step: Math.max(s.step, n), reveal: false, timer_end: null,
       voting_open: false, submit_open: false, scores_open: t.key === 'score', questions_open: true,
-      show_board: false, phone_view: 'auto',
+      quiz_open: false, quiz_reveal: false, show_board: false, phone_view: 'auto',
     })
   }
 
@@ -82,12 +84,12 @@ function Console() {
       {s.phase === 'winners' && <>
         <Toggle label="Leaderboard" on={s.show_board} onLabel="Hide the leaderboard" offLabel="Reveal the leaderboard" set={v => setSession({ show_board: v })} />
         <section className="card"><h3>Leaderboard ({board.length})</h3><Board rows={board} limit={60} /></section></>}
-      {s.phase === 'questions' && <QuestionControls s={s} />}
+      {s.phase === 'quiz' && <QuizControls s={s} people={people} answers={answers} />}
 
       <details className="card more"><summary>More controls</summary>
         <h3>Who can send right now</h3>
         <div className="gates">
-          {([['voting_open', 'Votes'], ['submit_open', 'Rewrites'], ['scores_open', 'Scores'], ['questions_open', 'Questions']] as [keyof SessionRow, string][]).map(([k, l]) => (
+          {([['voting_open', 'Votes'], ['submit_open', 'Rewrites'], ['scores_open', 'Scores'], ['quiz_open', 'Quiz'], ['questions_open', 'Questions']] as [keyof SessionRow, string][]).map(([k, l]) => (
             <button key={k} className={`btn ${s[k] ? 'btn-primary' : ''}`} onClick={() => setSession({ [k]: !s[k] })}>{l}: {s[k] ? 'Open' : 'Closed'}</button>
           ))}
         </div>
@@ -103,6 +105,8 @@ function Console() {
         <div className="people">{people.map(p => <span key={p.id} className="chip">{p.name}<button onClick={() => dbDelete('participants', { id: p.id })}>✕</button></span>)}</div>
       </details>
 
+      <details className="card more"><summary>Questions from the room</summary><QuestionControls s={s} /></details>
+
       <details className="card more"><summary>Edit the content</summary><ContentEditor /></details>
 
       <details className="card more"><summary>Start over</summary>
@@ -111,7 +115,7 @@ function Console() {
           if (!confirm('Delete everything and start over?')) return
           await sb.from('questions').delete().neq('id', ZERO)
           await sb.from('participants').delete().neq('id', ZERO)
-          await setSession({ phase: 'welcome', step: 0, round: 'cv1', reveal: false, timer_end: null, message: null, voting_open: false, submit_open: false, scores_open: false, questions_open: true, show_board: false, phone_view: 'auto' })
+          await setSession({ phase: 'welcome', step: 0, round: 'cv1', reveal: false, timer_end: null, message: null, voting_open: false, submit_open: false, scores_open: false, questions_open: true, quiz_open: false, quiz_reveal: false, show_board: false, phone_view: 'auto' })
           refreshAll()
         }}>Reset everything</button>
       </details>
@@ -242,6 +246,33 @@ function RewriteControls({ s, people }: { s: SessionRow; people: Participant[] }
           </div>
         : <p className="muted small">No examples for this patient. Add your own on the “Edit the content” panel, or pick the best real rewrite.</p>}
       {examples.map(x => <div key={x.id} className="q picked"><div className="q-body"><div className="q-text">{x.content}</div><small className="faint">Example</small></div></div>)}
+    </section>
+  )
+}
+
+function QuizControls({ s, people, answers }: { s: SessionRow; people: Participant[]; answers: AnswerRow[] }) {
+  const c = useContent()
+  const done = people.filter(p => answers.filter(a => a.participant_id === p.id).length >= c.quiz.length).length
+  const hit = (q: number) => answers.filter(a => a.q === q)
+  async function reset() {
+    if (!confirm('Clear every answer and start the quiz again?')) return
+    await sb.from('answers').delete().neq('q', -1)
+    await setSession({ quiz_open: false, quiz_reveal: false })
+    refreshAll()
+  }
+  return (
+    <section className="card">
+      <div className="row"><b>{done} of {people.length} finished all {c.quiz.length}</b><span className="muted small">{answers.length} answers in</span></div>
+      <div className="row">
+        <button className={`btn ${s.quiz_open ? '' : 'btn-primary'}`} onClick={() => setSession({ quiz_open: !s.quiz_open })}>{s.quiz_open ? 'Close the quiz' : 'Open the quiz'}</button>
+        <button className={`btn ${s.quiz_reveal ? '' : 'btn-primary'}`} onClick={() => setSession({ quiz_reveal: !s.quiz_reveal, quiz_open: false })}>{s.quiz_reveal ? 'Hide the answers' : 'Close and reveal the answers'}</button>
+        <button className="btn" onClick={reset}>Reset the quiz</button>
+      </div>
+      <h3>How the room is doing</h3>
+      {c.quiz.map((item, i) => {
+        const a = hit(i), right = a.filter(x => x.choice === item.answer).length
+        return <div key={i} className="row small" style={{ marginBottom: 2 }}><span>{i + 1}. {item.q}</span><b className={a.length && right / a.length < 0.5 ? 'neg' : 'pos'}>{a.length ? `${Math.round((100 * right) / a.length)}% right` : '–'}</b></div>
+      })}
     </section>
   )
 }

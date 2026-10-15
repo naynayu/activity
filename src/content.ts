@@ -12,7 +12,10 @@ export interface Content {
   good: CvExample
   /** Fictional patients for Hire or Pass. `weak` is the line the room rewrites; `note` is for the host only. */
   samples: Sample[]
+  /** 10 questions, 10 points each. `answer` is the index of the right option. */
+  quiz: QuizQ[]
 }
+export interface QuizQ { q: string; options: string[]; answer: number; why: string }
 export interface Sample { name: string; note: string; weak: string; rewrites: string[]; text: string }
 
 const BAD_TEXT = `CURRICULUM VITAE
@@ -98,6 +101,20 @@ AI tools (ChatGPT, Copilot) to draft and summarise correspondence
 EDUCATION
 B.Sc Business Administration, University of Lagos, 2019`
 
+
+export const QUIZ_POINTS = 10
+const QUIZ: QuizQ[] = [
+  { q: 'What does being “relevant” really mean?', options: ['Being busy all the time', 'Holding many certificates', 'People connect your name to a specific value', 'Having many followers'], answer: 2, why: 'Relevance is what people say you are known for when you are not in the room.' },
+  { q: 'Which carries more weight with employers and funders?', options: ['“I’m good at X”', '“I did X and it led to Y”', 'A long list of skills', 'A famous referee'], answer: 1, why: 'Proof beats claims. Show the work and the result.' },
+  { q: 'Where has the value moved now that AI handles routine tasks?', options: ['Typing speed', 'Judgment, problem framing, relationships and using AI well', 'Memorising facts', 'Working longer hours'], answer: 1, why: 'AI takes tasks. People who use it well keep the job.' },
+  { q: 'What is the best way to stand out?', options: ['Be good at everything', 'Copy what everyone else does', 'Combine two or three strengths into a clear identity', 'Wait to be noticed'], answer: 2, why: 'Intersections like “HR plus tech” are less crowded than single fields.' },
+  { q: 'On social media, what works best?', options: ['Random posts on five platforms', 'Posting only when you win', 'Consistency on one or two platforms', 'Never sharing a process'], answer: 2, why: 'Consistency on one beats random posts on five.' },
+  { q: 'When should you apply for a role?', options: ['Only at 100% fit', 'Even at 60 to 70% fit', 'Never without a referral', 'Only after a second degree'], answer: 1, why: 'Job descriptions are wish lists. Let the employer decide.' },
+  { q: 'Which CV bullet is strongest?', options: ['Responsible for social media', 'Helped with Instagram', 'Grew Instagram followers from 500 to 3,000 in 6 months', 'Good at social media'], answer: 2, why: 'Action verb, result and a number.' },
+  { q: 'Which of these should you leave OFF your CV?', options: ['LinkedIn link', 'Marital status', 'Specific tools you use', 'A portfolio link'], answer: 1, why: 'Date of birth, marital status, religion and state of origin cost you points and add nothing.' },
+  { q: 'What got Chimaobi promoted in his first year?', options: ['Waiting until he graduated', 'Proof of work, consistency and focus', 'His level of study', 'Knowing the right people'], answer: 1, why: 'Nobody waited for him to graduate. He did the work and showed it.' },
+  { q: 'How should you treat a rejection?', options: ['As proof you are not good enough', 'As a reason to stop applying', 'As part of the process: learn, then apply again', 'As a personal insult'], answer: 2, why: 'Your yes is hidden among your no’s. Keep applying.' },
+]
 
 const SAMPLES: Sample[] = [
   {
@@ -371,6 +388,7 @@ export const DEFAULTS: Content = {
   bad: { text: BAD_TEXT, chk: [3], ded: Array.from({ length: 18 }, (_, i) => i), typos: 1 },
   good: { text: GOOD_TEXT, chk: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], ded: [], typos: 0 },
   samples: SAMPLES,
+  quiz: QUIZ,
 }
 
 /** Editable content: the database row wins over these defaults, field by field. */
@@ -396,7 +414,7 @@ export const STEPS: Step[] = [
   { key: 'rewrite', title: 'Fix the line', say: 'Rewrite the weak line from the CV so it shows a result and a number.', minutes: 10 },
   { key: 'compare', title: 'Bad CV vs good CV', say: 'Look at both CVs. What is different?', minutes: 8 },
   { key: 'score', title: 'Score your own CV', say: 'Tick what your CV has, and what it should not have. Then send your score.', minutes: 20 },
+  { key: 'quiz', title: 'Quiz', say: 'Answer all 10 questions. Each one is worth 10 points.', minutes: 10 },
   { key: 'winners', title: 'Winners', say: 'The winners are announced here.', minutes: 5 },
-  { key: 'questions', title: 'Questions', say: 'Ask a question. Tap ▲ on the ones you want answered.', minutes: 20 },
 ]
 export const stepIndex = (p: Phase) => Math.max(0, STEPS.findIndex(s => s.key === p))

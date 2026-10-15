@@ -8,7 +8,7 @@ export type Row = Record<string, any>
 const PK: Record<string, string[]> = {
   session: ['id'], participants: ['id'], votes: ['participant_id', 'round'], submissions: ['id'],
   scores: ['participant_id'], awards: ['id'], questions: ['id'], question_votes: ['question_id', 'participant_id'],
-  content: ['id'],
+  content: ['id'], answers: ['participant_id', 'q'],
 }
 
 interface T { rows: Map<string, Row>; snap: Row[]; ready: boolean; loading: boolean; subs: Set<() => void>; dirty: boolean }

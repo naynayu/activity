@@ -18,8 +18,10 @@ A static React + Vite app on Vercel with all room state in Supabase, built the w
 3. **Fix the line**: the CV stays on each phone; everyone rewrites one weak line with a result and a number (60 seconds). Pick the best for +10 and they show on every phone.
 4. **Bad CV vs good CV**: an Executive Assistant example, scored −90 and 100.
 5. **Score your own CV**: tick the checklist and red flags on your phone, send your score.
-6. **Winners**: the leaderboard, hidden until you reveal it. Built for 50+ people.
-7. **Questions**: the room asks and upvotes. "Copy the unanswered ones" exports the list to answer afterwards.
+6. **Quiz**: 10 multiple-choice questions on the talk, 10 points each. The host opens it, closes it, reveals the answers, and can reset it.
+7. **Winners**: the leaderboard (CV score + quiz + any bonus points), hidden until you reveal it. Built for 50+ people.
+
+Anyone can also ask a question from the "Ask a question" tab on their phone. The host sees them under "Questions from the room".
 
 ## Host controls
 
@@ -38,7 +40,7 @@ the database clock (`server_time_ms`), so a wrong phone clock does not matter.
 ## Backend
 
 Supabase project `cv-clinic` (`xgjpygjpkkpakbixugoh`, eu-west-2): `session`, `participants`, `votes`,
-`submissions`, `scores`, `awards`, `questions`, `question_votes`, `content`, plus the `gate()` and
+`submissions`, `scores`, `answers`, `awards`, `questions`, `question_votes`, `content`, `cvs`, plus the `gate()` and
 `server_time_ms()` functions.
 
 ## Running

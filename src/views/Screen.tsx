@@ -2,21 +2,22 @@ import QRCode from 'qrcode'
 import { useEffect, useMemo, useState } from 'react'
 import { Board } from '../components/Board'
 import { CvView, useCv } from '../components/PatientCv'
-import { Questions } from '../components/Questions'
 import { StatusDot } from '../components/Status'
 import { STEPS, stepIndex, useContent } from '../content'
 import { clock, useCountdown, useSession } from '../data'
 import { buildBoard, computeScore } from '../scoring'
 import { useTable } from '../store'
-import type { AwardRow, Participant, ScoreRow, SessionRow, SubmissionRow, VoteRow } from '../types'
+import type { AnswerRow, AwardRow, Participant, ScoreRow, SessionRow, SubmissionRow, VoteRow } from '../types'
 
 export function Screen() {
   const s = useSession()
   const people = useTable<Participant>('participants').rows
   const scores = useTable<ScoreRow>('scores').rows
   const awards = useTable<AwardRow>('awards').rows
-  const board = useMemo(() => buildBoard(people, scores, awards), [people, scores, awards])
+  const allAnswers = useTable<AnswerRow>('answers').rows
+  const answerCount = allAnswers.length
   const c = useContent()
+  const board = useMemo(() => buildBoard(people, scores, awards, allAnswers, c), [people, scores, awards, allAnswers, c])
   const [qr, setQr] = useState('')
   useEffect(() => { QRCode.toDataURL(location.origin + location.pathname, { margin: 1, width: 400 }).then(setQr) }, [])
   if (!s) return <div className="screen"><h1>Loading…</h1></div>
@@ -57,7 +58,7 @@ export function Screen() {
         </div>
       )}
       {s.phase === 'winners' && (s.show_board ? <Board rows={board} big /> : <div className="screen-center"><div className="huge">🥁</div><h2>And the winners are…</h2></div>)}
-      {s.phase === 'questions' && <Questions mode="screen" />}
+      {s.phase === 'quiz' && <div className="screen-center"><h2>Quiz time</h2><p className="muted big-p">{step.say}</p><div className="huge">{answerCount}<small> answers in</small></div></div>}
     </div>
   )
 }
