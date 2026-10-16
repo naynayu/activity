@@ -80,10 +80,10 @@ function Console() {
       {s.phase === 'compare' && <Toggle label="Good CV" on={s.reveal} onLabel="Hide the good CV" offLabel="Reveal the good CV" set={v => setSession({ reveal: v })} />}
       {s.phase === 'score' && <>
         <Toggle label="Sending scores" on={s.scores_open} onLabel="Close scoring" offLabel="Open scoring" set={v => setSession({ scores_open: v })} />
-        <section className="card"><b>{scores.length} of {people.length}</b> sent a score.<Board rows={board} limit={10} /></section></>}
+        <section className="card"><b>{scores.length} of {people.length}</b> sent a score.<Board rows={board} /></section></>}
       {s.phase === 'winners' && <>
         <Toggle label="Leaderboard" on={s.show_board} onLabel="Hide the leaderboard" offLabel="Reveal the leaderboard" set={v => setSession({ show_board: v })} />
-        <section className="card"><h3>Leaderboard ({board.length})</h3><Board rows={board} limit={60} /></section></>}
+        <section className="card"><h3>Leaderboard ({board.length})</h3><Board rows={board} /></section></>}
       {s.phase === 'quiz' && <QuizControls s={s} people={people} answers={answers} />}
 
       <details className="card more"><summary>More controls</summary>

@@ -17,8 +17,8 @@ export const quizPoints = (answers: AnswerRow[], c: Content = getContent()) =>
 
 export interface BoardRow { id: string; name: string; game: number; quiz: number; bonus: number; total: number; rank: number }
 
-/** Game score plus hand-awarded points. Ties share a rank. Only people who have
- *  sent a score, answered the quiz or been given points appear. */
+/** Game score plus hand-awarded points. Ties share a rank. Everyone who joined is listed,
+ *  including people still on 0. */
 export function buildBoard(participants: Participant[], scores: ScoreRow[], awards: AwardRow[], answers: AnswerRow[] = [], c: Content = getContent()): BoardRow[] {
   const game = new Map(scores.map(s => [s.participant_id, s.score]))
   const bonus = new Map<string, number>()
@@ -26,7 +26,6 @@ export function buildBoard(participants: Participant[], scores: ScoreRow[], awar
   const quiz = new Map<string, AnswerRow[]>()
   answers.forEach(a => quiz.set(a.participant_id, [...(quiz.get(a.participant_id) ?? []), a]))
   const rows = participants
-    .filter(p => game.has(p.id) || bonus.has(p.id) || quiz.has(p.id))
     .map(p => {
       const g = game.get(p.id) ?? 0, b = bonus.get(p.id) ?? 0, qz = quizPoints(quiz.get(p.id) ?? [], c)
       return { id: p.id, name: p.name, game: g, quiz: qz, bonus: b, total: g + qz + b, rank: 0 }

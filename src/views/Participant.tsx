@@ -173,8 +173,8 @@ function Winners({ me, s }: { me: P; s: SessionRow }) {
     <>
       {mine ? <div className="card center"><div className="big">#{mine.rank}</div><div className="muted">{mine.total} points · {rows.length} players</div>
           <div className="muted small">CV score {mine.game} + quiz {mine.quiz}{mine.bonus ? ` + bonus ${mine.bonus}` : ''}</div></div>
-        : <p className="muted">Send your score to join the leaderboard.</p>}
-      <Board rows={rows} meId={me.id} limit={10} />
+        : <p className="muted">You are not on the board yet.</p>}
+      <Board rows={rows} meId={me.id} />
     </>
   )
 }
