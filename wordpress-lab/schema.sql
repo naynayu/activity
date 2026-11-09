@@ -5,6 +5,9 @@ create table session (
   id text primary key,
   step int not null default 0,
   message text,
+  quiz_on boolean not null default false,
+  quiz_open boolean not null default false,
+  quiz_reveal boolean not null default false,
   updated_at timestamptz not null default now()
 );
 insert into session (id) values ('main');
@@ -33,14 +36,24 @@ create table help (
   updated_at timestamptz not null default now()
 );
 
+-- one row per answer; changing your mind overwrites it
+create table answers (
+  participant_id uuid not null references participants(id) on delete cascade,
+  q int not null,
+  choice int not null,
+  primary key (participant_id, q)
+);
+
 alter table session enable row level security;
 alter table participants enable row level security;
 alter table progress enable row level security;
 alter table help enable row level security;
+alter table answers enable row level security;
 
 create policy "open" on session for all using (true) with check (true);
 create policy "open" on participants for all using (true) with check (true);
 create policy "open" on progress for all using (true) with check (true);
 create policy "open" on help for all using (true) with check (true);
+create policy "open" on answers for all using (true) with check (true);
 
-alter publication supabase_realtime add table session, participants, progress, help;
+alter publication supabase_realtime add table session, participants, progress, help, answers;

@@ -115,3 +115,16 @@ export const STEPS: Step[] = [
 ]
 
 export const taskKey = (step: number, task: number) => `${step}:${task}`
+
+export interface QuizQ { q: string; options: string[]; answer: number; why: string }
+export const QUIZ_POINTS = 10
+export const QUIZ: QuizQ[] = [
+  { q: 'Which is dated and shows newest first on a blog?', options: ['A page', 'A post', 'A menu', 'A theme'], answer: 1, why: 'Posts are the dated updates. Pages (About, Contact) are permanent.' },
+  { q: 'What is every piece of content in the WordPress editor?', options: ['A widget', 'A shortcode', 'A block', 'A plugin'], answer: 2, why: 'Paragraphs, headings and images are all blocks.' },
+  { q: 'You want an About page that stays the same. Use a…', options: ['Post', 'Page', 'Tag', 'Comment'], answer: 1, why: 'Pages are for permanent content.' },
+  { q: 'Categories are best described as…', options: ['The main sections of your blog', 'Colours for your theme', 'Spam filters', 'Passwords'], answer: 0, why: 'Categories are sections; tags are the finer details.' },
+  { q: 'What does changing your theme do to your posts?', options: ['Deletes them', 'Keeps them and changes the look', 'Moves them to drafts', 'Makes them private'], answer: 1, why: 'Content and design are separate.' },
+  { q: 'What adds extra features such as a contact form?', options: ['A plugin', 'A permalink', 'A category', 'A block pattern only'], answer: 0, why: 'Plugins add features. Install only what you need.' },
+  { q: 'Why choose the “Post name” permalink?', options: ['It is faster', 'It makes readable web addresses', 'It hides your posts', 'It adds comments'], answer: 1, why: 'yoursite.com/my-first-post beats ?p=123.' },
+  { q: 'A Playground site is…', options: ['Permanent hosting', 'Temporary, so download a backup', 'Public to everyone', 'Free forever'], answer: 1, why: 'Save a zip before closing the tab, then move to real hosting.' },
+]

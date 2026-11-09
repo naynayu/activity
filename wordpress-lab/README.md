@@ -7,9 +7,9 @@ in-browser WordPress, no install). Separate from CV Clinic: its own app and its 
 | --- | --- | --- |
 | `/` | Learners (phones) | Join with a first name, tick off tasks, tap "I'm stuck" |
 | `/#screen` | Projector | Current step, tasks, QR code, "7 / 20 finished", who needs help |
-| `/#host` | Facilitator (PIN in `src/config.ts`) | Back/Next, live progress per person, stuck list, message to phones |
+| `/#host` | Facilitator (PIN in `src/config.ts`) | Back/Next, live progress per person, stuck list, quiz controls, message to phones |
 
-## The 9 steps (about 90 minutes)
+## The 9 steps (about 90 minutes), then an 8-question quiz
 Get WordPress, name the blog, first post, categories and tags, About page, menu, look and feel,
 plugin and comments, show it and keep it. Edit `src/content.ts` to change any of it.
 

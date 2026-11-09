@@ -23,3 +23,5 @@ button,input { font:inherit; color:inherit }
 .skel { height:140px; margin-top:80px; border-radius:14px; background:var(--line) }
 .screen { display:grid; grid-template-columns:1fr 340px; gap:48px; padding:48px; min-height:100vh; align-items:start } .huge-t { font-size:56px; margin:8px 0 } .lead { font-size:26px } .lead-list { font-size:24px; line-height:1.6 }
 @media (max-width:900px) { .screen { grid-template-columns:1fr; padding:20px } .huge-t { font-size:36px } .lead,.lead-list { font-size:19px } }
+.opt-btn { display:block; width:100%; text-align:left; margin-top:8px } .right { border-color:var(--pos); color:var(--pos) } .wrong { border-color:var(--neg); color:var(--neg) }
+.big { font-size:48px; font-weight:700; line-height:1.1 } .big small { font-size:18px; color:var(--muted) } .me { font-weight:700; color:var(--accent) }

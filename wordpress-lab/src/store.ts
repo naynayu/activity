@@ -4,7 +4,7 @@ import { sb } from './supabase'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Row = Record<string, any>
 const PK: Record<string, string[]> = {
-  session: ['id'], participants: ['id'], progress: ['participant_id', 'step', 'task'], help: ['participant_id'],
+  session: ['id'], participants: ['id'], progress: ['participant_id', 'step', 'task'], help: ['participant_id'], answers: ['participant_id', 'q'],
 }
 interface T { rows: Map<string, Row>; snap: Row[]; ready: boolean; subs: Set<() => void>; dirty: boolean }
 const tables: Record<string, T> = {}

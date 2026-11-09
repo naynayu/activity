@@ -4,7 +4,8 @@ import { HOST_PIN } from '../config'
 import { STEPS } from '../content'
 import { setSession, useSession } from '../data'
 import { dbDelete, dbUpdate, useTable } from '../store'
-import type { HelpRow, Participant, ProgressRow } from '../types'
+import { Board, leaderboard } from './Quiz'
+import type { AnswerRow, HelpRow, Participant, ProgressRow } from '../types'
 
 const ok = () => { try { return sessionStorage.getItem('wp-host') === '1' } catch { return false } }
 
@@ -27,6 +28,7 @@ function Console() {
   const people = useTable<Participant>('participants').rows
   const progress = useTable<ProgressRow>('progress').rows
   const help = useTable<HelpRow>('help').rows
+  const answers = useTable<AnswerRow>('answers').rows
   const [msg, setMsg] = useState('')
   const rows = useMemo(() => {
     if (!s) return []
@@ -69,6 +71,15 @@ function Console() {
           </div>
         ))}
         {people.length === 0 && <p className="muted">Nobody has joined yet. Show the QR code.</p>}
+      </div>
+      <div className="card">
+        <div className="row"><b>Quick quiz</b><span className="muted small">{new Set(answers.map(a => a.participant_id)).size} answering</span></div>
+        <div className="two">
+          <button className="btn" onClick={() => setSession({ quiz_on: !s.quiz_on, quiz_open: false, quiz_reveal: false })}>{s.quiz_on ? 'Back to the steps' : 'Show quiz on phones'}</button>
+          <button className="btn" disabled={!s.quiz_on || s.quiz_reveal} onClick={() => setSession({ quiz_open: !s.quiz_open })}>{s.quiz_open ? 'Close answers' : 'Open answers'}</button>
+        </div>
+        <button className="btn btn-primary btn-big" disabled={!s.quiz_on} onClick={() => setSession({ quiz_open: false, quiz_reveal: !s.quiz_reveal })}>{s.quiz_reveal ? 'Hide answers and board' : 'Reveal answers and leaderboard'}</button>
+        {s.quiz_reveal && <div style={{ marginTop: 12 }}><Board rows={leaderboard(people, answers)} /></div>}
       </div>
       <div className="card">
         <b>Message to every phone</b>

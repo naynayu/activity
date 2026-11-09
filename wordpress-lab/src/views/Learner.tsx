@@ -2,6 +2,7 @@ import { Bar, StatusDot } from '../components'
 import { PLAYGROUND_URL, STEPS, taskKey } from '../content'
 import { useSession } from '../data'
 import { dbDelete, dbUpsert, useTable } from '../store'
+import { Quiz } from './Quiz'
 import type { HelpRow, Participant, ProgressRow } from '../types'
 
 export function Learner({ me, onLeave }: { me: Participant; onLeave: () => void }) {
@@ -9,6 +10,13 @@ export function Learner({ me, onLeave }: { me: Participant; onLeave: () => void 
   const progress = useTable<ProgressRow>('progress').rows.filter(p => p.participant_id === me.id)
   const help = useTable<HelpRow>('help').rows.find(h => h.participant_id === me.id)
   if (!s) return <div className="phone"><div className="skel" /></div>
+  if (s.quiz_on) return (
+    <div className="phone">
+      <header className="phone-head"><div><b>{me.name}</b> <StatusDot /></div><button className="btn" onClick={onLeave}>Leave</button></header>
+      {s.message && <div className="banner">{s.message}</div>}
+      <Quiz me={me} s={s} />
+    </div>
+  )
   const step = STEPS[Math.min(s.step, STEPS.length - 1)]
   const done = new Set(progress.map(p => taskKey(p.step, p.task)))
   const doneHere = step.tasks.filter((_, i) => done.has(taskKey(s.step, i))).length
